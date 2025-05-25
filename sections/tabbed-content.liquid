@@ -1,0 +1,293 @@
+{{ 'component-pills.css' | asset_url | stylesheet_tag }}
+
+{% liquid
+  assign block_section_class = 'block-section'
+  unless section.settings.color_scheme == 'background-1'
+    assign block_section_class = block_section_class | append: ' block-section-padded'
+  endunless
+%}
+
+<style>
+  #shopify-section-{{ section.id }} .block-section {
+  	margin-top: {{ section.settings.spacing_top | times: 0.8 | round: 0 }}px;
+  	margin-bottom: {{ section.settings.spacing_bottom | times: 0.8 | round: 0 }}px;
+  }
+
+  #shopify-section-{{ section.id }} .block-section-padded {
+  	margin-top: 0;
+  	margin-bottom: 0;
+  	padding-top: {{ section.settings.spacing_top | times: 0.8 | round: 0 }}px;
+  	padding-bottom: {{ section.settings.spacing_bottom | times: 0.8 | round: 0 }}px;
+  }
+
+  @media (min-width: 990px) {
+  	#shopify-section-{{ section.id }} .block-section {
+  		margin-top: {{ section.settings.spacing_top }}px;
+  		margin-bottom: {{ section.settings.spacing_bottom }}px;
+  	}
+
+  	#shopify-section-{{ section.id }} .block-section-padded {
+  		margin-top: 0;
+  		margin-bottom: 0;
+  		padding-top: {{ section.settings.spacing_top }}px;
+  		padding-bottom: {{ section.settings.spacing_bottom }}px;
+  	}
+  }
+</style>
+
+{%- capture visibility_classes -%}{%- render 'section-visibility-classes' -%}{%- endcapture -%}
+{%- assign visibility_classes = visibility_classes | strip -%}
+
+<div class="{{ visibility_classes }}">
+  <div class="color-{{ section.settings.color_scheme }}">
+    <div class="container">
+      <div class="{{ block_section_class }}">
+        <div class="block-pill-nav-slider">
+          {% if section.settings.heading != blank
+            or section.settings.subheading != blank
+            or section.blocks.size > 0
+          %}
+            <div class="block-block-section-title-wrapper">
+              {% if section.settings.heading != blank or section.settings.subheading != blank %}
+                <div class="block-section-title-wrap">
+                  {% if section.settings.heading != blank %}
+                    <{{ section.settings.heading_tag }} class="block-section-title heading-size-{{ section.settings.heading_size }}">
+                      {{- section.settings.heading -}}
+                    </{{ section.settings.heading_tag }}>
+                  {% endif %}
+                  {% if section.settings.subheading != blank %}
+                    <p class="block-section-subtitle">{{ section.settings.subheading }}</p>
+                  {% endif %}
+                </div>
+              {% endif %}
+
+              {% if section.blocks.size > 0 %}
+                <div class="block-section-title-aux">
+                  <tabs-navigation for="TabComponent-{{ section.id }}">
+                    <div class="pill-nav">
+                      {% for block in section.blocks %}
+                        <a
+                          href="#"
+                          class="pill-nav-item {% if forloop.index0 == 0 %}is-active{% endif %} color-background-1"
+                          data-handle="{{ block.settings.label }}-{{ forloop.index0 }}"
+                          {{ block.shopify_attributes }}
+                        >
+                          {{ block.settings.heading }}
+                        </a>
+                      {% endfor %}
+                    </div>
+                  </tabs-navigation>
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <tabs-component id="TabComponent-{{ section.id }}" class="tabs-component">
+            {% for block in section.blocks %}
+              <div
+                class="tabs-component-content"
+                data-handle="{{ block.settings.label }}-{{ forloop.index0 }}"
+                aria-hidden="{% if forloop.index0 != 0 %}true{% else %}false{% endif %}"
+              >
+                {% if block.settings.page != blank %}
+                  <div class="rte page-content">
+                    {{ block.settings.page.content }}
+                  </div>
+                {% else %}
+                  <div class="rte">
+                    {{ block.settings.content }}
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </tabs-component>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+  {
+    "name": "t:sections.tabbed_content.name",
+    "tag": "section",
+    "class": "section-tabbed-content",
+    "disabled_on": {
+      "groups": ["header", "footer", "custom.overlays"]
+    },
+    "settings": [
+      {
+        "type": "inline_richtext",
+        "id": "heading",
+        "label": "t:sections.tabbed_content.settings.heading.label",
+        "default": "Tabbed content"
+      },
+      {
+        "type": "select",
+        "id": "heading_size",
+        "label": "t:sections.all.heading_size.label",
+        "default": "md",
+        "options": [
+          {
+            "value": "sm",
+            "label": "t:sections.all.heading_size.options.label_sm"
+          },
+          {
+            "value": "md",
+            "label": "t:sections.all.heading_size.options.label_md"
+          },
+          {
+            "value": "lg",
+            "label": "t:sections.all.heading_size.options.label_lg"
+          },
+          {
+            "value": "xl",
+            "label": "t:sections.all.heading_size.options.label_xl"
+          },
+          {
+            "value": "xxl",
+            "label": "t:sections.all.heading_size.options.label_xxl"
+          }
+        ]
+      },
+      {
+        "type": "inline_richtext",
+        "id": "subheading",
+        "label": "t:sections.tabbed_content.settings.subheading.label"
+      },
+      {
+        "type": "header",
+        "content": "t:sections.all.colors.heading"
+      },
+      {
+        "type": "select",
+        "id": "color_scheme",
+        "label": "t:sections.all.colors.color_scheme.label",
+        "default": "background-1",
+        "options": [
+          {
+            "value": "accent-1",
+            "label": "t:sections.all.colors.accent_1.label"
+          },
+          {
+            "value": "accent-2",
+            "label": "t:sections.all.colors.accent_2.label"
+          },
+          {
+            "value": "accent-3",
+            "label": "t:sections.all.colors.accent_3.label"
+          },
+          {
+            "value": "background-1",
+            "label": "t:sections.all.colors.background_1.label"
+          },
+          {
+            "value": "background-2",
+            "label": "t:sections.all.colors.background_2.label"
+          }
+        ]
+      },
+      {
+        "type": "header",
+        "content": "t:sections.all.section_spacing.heading"
+      },
+      {
+        "type": "range",
+        "id": "spacing_top",
+        "min": 0,
+        "max": 150,
+        "step": 2,
+        "default": 60,
+        "label": "t:sections.all.section_spacing.spacing_top.label"
+      },
+      {
+        "type": "range",
+        "id": "spacing_bottom",
+        "min": 0,
+        "max": 150,
+        "step": 2,
+        "default": 60,
+        "label": "t:sections.all.section_spacing.spacing_bottom.label"
+      },
+      {
+        "type": "header",
+        "content": "t:sections.all.advanced.heading.label"
+      },
+      {
+        "type": "select",
+        "id": "heading_tag",
+        "label": "t:sections.all.advanced.heading_tag.label",
+        "default": "h2",
+        "options": [
+          {
+            "value": "h1",
+            "label": "H1"
+          },
+          {
+            "value": "h2",
+            "label": "H2"
+          },
+          {
+            "value": "h3",
+            "label": "H3"
+          }
+        ]
+      },
+      {
+        "type": "checkbox",
+        "id": "show_on_desktop",
+        "default": true,
+        "label": "t:sections.all.advanced.show_on_desktop.label"
+      },
+      {
+        "type": "checkbox",
+        "id": "show_on_mobile",
+        "default": true,
+        "label": "t:sections.all.advanced.show_on_mobile.label"
+      }
+    ],
+    "max_blocks": 5,
+    "blocks": [
+      {
+        "type": "tab",
+        "name": "t:sections.tabbed_content.blocks.tab.name",
+        "settings": [
+          {
+            "type": "text",
+            "id": "heading",
+            "label": "t:sections.tabbed_content.blocks.tab.settings.heading.label",
+            "default": "Tab heading"
+          },
+          {
+            "type": "richtext",
+            "id": "content",
+            "default": "<p>Craft an engaging narrative for your customers. Share captivating stories about your products, make exciting announcements, or promote special offers.</p>",
+            "label": "t:sections.tabbed_content.blocks.tab.settings.content.label"
+          },
+          {
+            "type": "page",
+            "id": "page",
+            "label": "t:sections.tabbed_content.blocks.tab.settings.page.label",
+            "info": "t:sections.tabbed_content.blocks.tab.settings.page.info"
+          }
+        ]
+      }
+    ],
+    "presets": [
+      {
+        "name": "t:sections.tabbed_content.preset.name",
+        "blocks": [
+          {
+            "type": "tab"
+          },
+          {
+            "type": "tab"
+          },
+          {
+            "type": "tab"
+          }
+        ]
+      }
+    ]
+  }
+{% endschema %}
