@@ -21,6 +21,7 @@
   data-section-id="{{ section.id }}"
   data-api-base-url="{{ global_api_base_url }}"
   data-api-token="{{ global_api_token | escape }}"
+  data-storefront-api-token="{{ section.settings.storefront_api_token | escape }}"
   data-api-get-types="{{ global_api_base_url }}/fitment/getTypeOptions"
   data-api-get-categories="{{ global_api_base_url }}/fitment/getFitmentCategories"
   data-api-get-makes="{{ global_api_base_url }}/fitment/getMakeOptions"
@@ -136,7 +137,13 @@
   "settings": [
     { "type": "text", "id": "title", "label": "Section Title", "default": "Find Parts for Your Vehicle" },
     { "type": "header", "content": "API Configuration" },
-    { "type": "paragraph", "content": "API credentials (Base URL, Token) are now configured globally under Theme Settings > API Integrations." },
+    { "type": "paragraph", "content": "Gamma API credentials (Base URL, Token) are configured globally under Theme Settings > API Integrations." },
+    {
+      "type": "text",
+      "id": "storefront_api_token",
+      "label": "Shopify Storefront API Access Token",
+      "info": "Enter your public Shopify Storefront API access token. Required for fetching product data directly from Shopify."
+    },
     { "type": "header", "content": "Visibility Toggle" },
     { "type": "checkbox", "id": "enable_toggle", "label": "Make Section Collapsible", "default": false, "info": "Adds a button to show/hide the fitment selector content. Open on desktop, closed on mobile by default. Remembers user preference." }
   ],

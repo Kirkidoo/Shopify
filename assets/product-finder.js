@@ -1,8 +1,4 @@
-console.log('product-finder.js executing...'); // Version indicator - Enhanced
-
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOMContentLoaded event fired.');
-
   // --- Constants ---
   const PLACEHOLDERS = { TYPE: '-- Select Type --', CATEGORY: '-- Select Category --', MAKE: '-- Select Make --', YEAR: '-- Select Year --', MODEL: '-- Select Model --' };
   const API_RESPONSE_KEYS = { TYPES: 'types', CATEGORIES: 'fitmentCategories', MAKES: 'makes', YEARS: 'years', MODELS: 'models', PRODUCTS: 'fitmentProducts', PRODUCT_SKU: 'itemNumber', PRODUCT_DESC: 'description', CATEGORY_MAIN: 'category', CATEGORY_SUB: 'subCategory' };
@@ -12,19 +8,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const STORAGE_KEY_PREFIX = 'fitmentToggleState_';
   const LAST_SELECTED_VEHICLE_STORAGE_KEY = 'lastSelectedVehicle';
   const SKELETON_CARD_COUNT = 6; // Number of skeleton cards to show while loading products
-
+  // --- Shopify Storefront API Constants ---
+  // IMPORTANT: Replace 'YOUR_STOREFRONT_API_ACCESS_TOKEN' with your actual Storefront API access token.
+  // This token is typically public and used for client-side API requests.
+  // Consider making this configurable via theme settings or a global Shopify JavaScript object if possible.
+  const SHOPIFY_STOREFRONT_ACCESS_TOKEN = section.dataset.storefrontApiToken || 'YOUR_STOREFRONT_API_ACCESS_TOKEN_PLACEHOLDER';
+  const SHOPIFY_GRAPHQL_URL = Shopify?.routes?.root ? (Shopify.routes.root.endsWith('/') ? Shopify.routes.root : Shopify.routes.root + '/') + 'api/2023-10/graphql.json' : '/api/2023-10/graphql.json';
   // Check if Choices library is loaded globally
   if (typeof Choices === 'undefined') {
     console.error('Choices.js library not found. Please ensure it is loaded globally before this script.');
   }
 
   const fitmentSections = document.querySelectorAll('.fitment-selector-section');
-  console.log(`Found ${fitmentSections.length} fitment sections.`);
 
   fitmentSections.forEach((section) => {
     const sectionId = section.dataset.sectionId;
     const storageKey = `${STORAGE_KEY_PREFIX}${sectionId}`;
-    console.log(`Processing section: ${sectionId}`);
 
     // --- Configuration & Element References ---
     const apiBaseUrl = section.dataset.apiBaseUrl;
@@ -91,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = JSON.parse(itemStr);
             if (new Date().getTime() > item.expiry) {
                 sessionStorage.removeItem(cacheKey);
-                console.log(`Cache expired for key: ${cacheKey}`);
+                // console.log(`Cache expired for key: ${cacheKey}`);
                 return null;
             }
             return item.value;
@@ -119,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     sessionStorage.removeItem(key);
                 }
             });
-            console.log(`Cleared fitment cache for section ${sectionId}`);
+            // console.log(`Cleared fitment cache for section ${sectionId}`);
         } catch (e) {
             console.error(`Error clearing cache for section ${sectionId}:`, e);
         }
@@ -161,20 +160,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const resetSelect = (selectElement, placeholder, disable = true) => {
       if (!selectElement) return;
-      let placeholderOption = selectElement.querySelector('option[value=""]');
-      if (!placeholderOption) {
+
+      let placeholderOption = selectElement.options[0]; // Try to get the first option
+
+      if (placeholderOption && placeholderOption.value === "" && placeholderOption.textContent === placeholder) {
+          // If the first option is the correct placeholder, keep it and remove others
+          selectElement.options.length = 1;
+          placeholderOption.selected = true; // Ensure it's selected
+      } else {
+          // Otherwise, clear everything and create/re-add the placeholder
+          selectElement.options.length = 0;
           placeholderOption = document.createElement('option');
           placeholderOption.value = "";
           placeholderOption.disabled = true;
           placeholderOption.selected = true;
           placeholderOption.textContent = placeholder;
-          selectElement.innerHTML = '';
           selectElement.appendChild(placeholderOption);
-      } else {
-          selectElement.innerHTML = '';
-          selectElement.appendChild(placeholderOption);
-          placeholderOption.selected = true;
       }
+
       selectElement.disabled = disable;
       if (selectElement === elements.categorySelect) {
           destroyCategoryChoices();
@@ -187,10 +190,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectElement) selectElement.disabled = true;
         return;
       }
-      const placeholder = selectElement.options[0];
-      selectElement.innerHTML = '';
-      selectElement.appendChild(placeholder);
-      placeholder.selected = true;
+
+      let placeholderOption = selectElement.options[0];
+
+      // Ensure the placeholder is correctly identified and handled
+      if (!placeholderOption || placeholderOption.value !== "" || !placeholderOption.disabled) {
+          // If no placeholder, or it's not the one we expect (e.g. value not empty, not disabled)
+          // This case ideally shouldn't be hit if resetSelect was called first, but as a safeguard:
+          selectElement.options.length = 0; // Clear all
+          placeholderOption = document.createElement('option');
+          placeholderOption.value = "";
+          placeholderOption.disabled = true;
+          placeholderOption.textContent = PLACEHOLDERS[selectElement.id.split('-')[1].toUpperCase()] || '-- Select --'; // Fallback placeholder text
+          selectElement.appendChild(placeholderOption);
+      } else {
+          // Placeholder exists and seems correct, clear other options
+          selectElement.options.length = 1;
+      }
+      placeholderOption.selected = true; // Ensure placeholder is selected
 
       options.forEach((option) => {
         const optionElement = document.createElement('option');
@@ -228,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 categoryChoicesInstance = new Choices(elements.categorySelect, {
                     searchEnabled: true, itemSelectText: '', shouldSort: false, placeholder: true, removeItemButton: false, searchPlaceholderValue: "Type to filter categories...",
                 });
-                console.log(`Choices.js initialized for section ${sectionId} category select.`);
+                // console.log(`Choices.js initialized for section ${sectionId} category select.`);
                 elements.categorySelect.disabled = false;
             } catch (e) {
                 console.error(`Error initializing Choices.js for section ${sectionId}:`, e);
@@ -279,11 +296,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const resetAllSelectorsAndResults = () => {
-      console.log(`Resetting all selectors for section ${sectionId}`);
+      // console.log(`Resetting all selectors for section ${sectionId}`);
       clearCache();
       try {
           localStorage.removeItem(LAST_SELECTED_VEHICLE_STORAGE_KEY);
-          console.log(`Cleared last selected vehicle from localStorage.`);
+          // console.log(`Cleared last selected vehicle from localStorage.`);
       } catch (e) {
           console.warn(`Could not clear last selected vehicle from localStorage:`, e);
       }
@@ -344,14 +361,14 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             try {
                 localStorage.setItem(LAST_SELECTED_VEHICLE_STORAGE_KEY, JSON.stringify(selectedVehicle));
-                console.log('Saved selected vehicle to localStorage:', selectedVehicle);
+                // console.log('Saved selected vehicle to localStorage:', selectedVehicle);
             } catch (e) {
                 console.warn('Could not save selected vehicle to localStorage:', e);
             }
         } else {
              try {
                  localStorage.removeItem(LAST_SELECTED_VEHICLE_STORAGE_KEY);
-                 console.log('Cleared last selected vehicle from localStorage (incomplete selection).');
+                 // console.log('Cleared last selected vehicle from localStorage (incomplete selection).');
              } catch (e) {
                   console.warn('Could not clear last selected vehicle from localStorage:', e);
              }
@@ -361,9 +378,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- API and Shopify Fetching Functions ---
 
     const fetchAPI = async (url, method = 'GET', body = null) => {
-        if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+        // Ensure URL is valid, especially if constructed dynamically
+        let validUrl;
+        try {
+            validUrl = new URL(url, window.location.origin); // Use a base if URL can be relative
+        } catch (e) {
             throw new Error(`Invalid API endpoint URL: ${url}`);
         }
+        if (!['http:', 'https:'].includes(validUrl.protocol)) {
+             throw new Error(`Invalid API endpoint URL protocol: ${url}`);
+        }
+
         const headers = { 'Authorization': `Bearer ${apiToken}`, 'Accept': 'application/json' };
         const options = { method: method, headers: headers, signal: AbortSignal.timeout(15000) }; // 15 second timeout
         if (body && (method === 'POST' || method === 'PUT')) {
@@ -402,56 +427,168 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Fetches Shopify product/variant data by SKU.
-     * PERFORMANCE NOTE: This makes two requests per SKU. If the Shopify API supports
-     * batch fetching products by multiple SKUs or handles, that would be more performant.
-     * Consider investigating Shopify's GraphQL API for batch operations if performance becomes an issue.
+     * Fetches Shopify product and variant data for multiple SKUs using a single GraphQL query.
+     * @param {Array<{sku: string, description: string}>} skuWithDescArray - Array of objects, each with sku and its original description.
+     * @returns {Promise<Array<{sku: string, description: string, shopifyResult: {product: object, variant: object}|null}>>}
+     *          An array of objects, each containing the original SKU, description, and the fetched Shopify data (or null if not found/error).
+     * POTENTIAL IMPROVEMENT: If the number of SKUs is very large (e.g., > 50-100), the generated query string
+     * might exceed URL length limits or API complexity limits. Batching requests (e.g., 20-30 SKUs per call)
+     * would be a more robust solution in such scenarios.
      */
-    const fetchShopifyProductBySkuMultiStep = async (sku) => {
-        if (!sku) return null;
-        const normalizedSku = String(sku).trim().toLowerCase();
-        if (!normalizedSku) return null;
-        let productHandle = null;
-        try {
-            const encodedSkuQuery = encodeURIComponent(`variants.sku:"${normalizedSku}"`);
-            // Fetching minimal data: only handle
-            const suggestUrl = `/search/suggest.json?q=${encodedSkuQuery}&resources[type]=product&resources[limit]=1&resources[options][unavailable_products]=show&resources[fields]=handle`;
-            const suggestResponse = await fetch(suggestUrl);
-            if (suggestResponse.ok) {
-                const suggestions = await suggestResponse.json();
-                const products = suggestions?.resources?.results?.products;
-                if (products && products.length > 0) productHandle = products[0].handle;
-            }
-        } catch (error) { console.error(`Shopify suggest fetch error for SKU ${normalizedSku}:`, error); }
-
-        if (productHandle) {
-            try {
-                const productJsonUrl = `/products/${productHandle}.js`;
-                const productResponse = await fetch(productJsonUrl);
-                if (productResponse.ok) {
-                    const fullProductData = await productResponse.json();
-                    if (fullProductData && Array.isArray(fullProductData.variants)) {
-                        const matchingVariant = fullProductData.variants.find(v => v.sku && String(v.sku).trim().toLowerCase() === normalizedSku);
-                        if (matchingVariant) return { product: fullProductData, variant: matchingVariant };
-                    }
-                }
-            } catch (error) { console.error(`Shopify product JSON fetch error for handle ${productHandle}:`, error); }
+    const fetchShopifyProductsBySkusGraphQL = async (skuWithDescArray) => {
+        if (!SHOPIFY_STOREFRONT_ACCESS_TOKEN || SHOPIFY_STOREFRONT_ACCESS_TOKEN === 'YOUR_STOREFRONT_API_ACCESS_TOKEN_PLACEHOLDER') {
+            console.error('Shopify Storefront API access token is not configured.');
+            // Return structure consistent with error for each SKU
+            return skuWithDescArray.map(item => ({
+                ...item,
+                shopifyResult: null,
+                error: 'Storefront API token not configured'
+            }));
         }
-        return null;
+
+        const uniqueSkus = [...new Set(skuWithDescArray.map(item => String(item.sku).trim()).filter(Boolean))];
+        if (uniqueSkus.length === 0) return skuWithDescArray.map(item => ({ ...item, shopifyResult: null }));
+
+        // Construct the query string: "sku:SKU1 OR sku:SKU2 OR ..."
+        const skuQueryString = uniqueSkus.map(sku => `sku:${sku}`).join(' OR ');
+
+        const graphqlQuery = `
+            query GetProductsBySkus {
+              products(first: ${uniqueSkus.length * 2}, query: "${skuQueryString}") { # Fetch more in case of unrelated partial matches, then filter
+                edges {
+                  node {
+                    id
+                    handle
+                    title
+                    featuredImage { url altText }
+                    variants(first: 25) { # Assuming up to 25 variants per product, adjust if necessary
+                      edges {
+                        node {
+                          id
+                          sku
+                          title
+                          available
+                          price { amount currencyCode }
+                          image { url altText }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        `;
+
+        try {
+            const response = await fetch(SHOPIFY_GRAPHQL_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Shopify-Storefront-Access-Token': SHOPIFY_STOREFRONT_ACCESS_TOKEN,
+                },
+                body: JSON.stringify({ query: graphqlQuery }),
+                signal: AbortSignal.timeout(20000) // 20 second timeout for GraphQL query
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`GraphQL API Error: ${response.status} ${response.statusText}`, errorText);
+                throw new Error(`GraphQL API request failed: ${response.status} ${response.statusText}`);
+            }
+
+            const jsonResponse = await response.json();
+            if (jsonResponse.errors) {
+                console.error('GraphQL Query Errors:', jsonResponse.errors);
+                throw new Error('GraphQL query returned errors: ' + jsonResponse.errors.map(e => e.message).join('; '));
+            }
+
+            const fetchedProducts = jsonResponse.data?.products?.edges || [];
+
+            // Map GraphQL results back to the original skuWithDescArray structure
+            return skuWithDescArray.map(item => {
+                const normalizedInputSku = String(item.sku).trim().toLowerCase();
+                let foundProductNode = null;
+                let foundVariantNode = null;
+
+                for (const productEdge of fetchedProducts) {
+                    const productNode = productEdge.node;
+                    if (productNode && productNode.variants && productNode.variants.edges) {
+                        for (const variantEdge of productNode.variants.edges) {
+                            const variantNode = variantEdge.node;
+                            if (variantNode && String(variantNode.sku).trim().toLowerCase() === normalizedInputSku) {
+                                foundProductNode = productNode;
+                                foundVariantNode = variantNode;
+                                break;
+                            }
+                        }
+                    }
+                    if (foundVariantNode) break;
+                }
+
+                if (foundProductNode && foundVariantNode) {
+                    // Adapt to the structure expected by createProductCard
+                    // Price is an object {amount, currencyCode}, createProductCard expects variant.price to be a number (cents)
+                    // Storefront API returns decimal, e.g. 19.99. createProductCard does price/100, so this should be fine.
+                    const shopifyProduct = {
+                        handle: foundProductNode.handle,
+                        title: foundProductNode.title,
+                        featured_image: foundProductNode.featuredImage?.url || null, // product.featured_image
+                        // Other product fields if needed by createProductCard directly
+                    };
+                    const shopifyVariant = {
+                        id: foundVariantNode.id, // GID, e.g., "gid://shopify/ProductVariant/12345"
+                        sku: foundVariantNode.sku,
+                        title: foundVariantNode.title,
+                        available: foundVariantNode.available,
+                        price: parseFloat(foundVariantNode.price.amount), // createProductCard expects amount
+                        // featured_image for variant, createProductCard uses variant.featured_image.src
+                        featured_image: {
+                            src: foundVariantNode.image?.url || foundProductNode.featuredImage?.url || null,
+                            alt: foundVariantNode.image?.altText || foundProductNode.featuredImage?.altText || foundProductNode.title
+                        }
+                        // Other variant fields if needed
+                    };
+                    return { ...item, shopifyResult: { product: shopifyProduct, variant: shopifyVariant } };
+                } else {
+                    return { ...item, shopifyResult: null };
+                }
+            });
+
+        } catch (error) {
+            console.error('Error in fetchShopifyProductsBySkusGraphQL:', error);
+            // Return structure consistent with error for each SKU
+            return skuWithDescArray.map(item => ({
+                ...item,
+                shopifyResult: null,
+                error: error.message || 'Failed to fetch product data via GraphQL'
+            }));
+        }
     };
+
 
     /** Creates an HTML product card element. Adds 'card-fade-in' class for animation. */
     const createProductCard = (product, variant) => {
         if (!product || !variant) return null;
         const cardLink = document.createElement('a');
         cardLink.className = 'fitment-product-card card-fade-in'; // Added card-fade-in
-        cardLink.href = variant.id ? `/products/${product.handle}?variant=${variant.id}` : `/products/${product.handle}`;
+        // variant.id from GraphQL is a GID. For URL, we need the numeric part of ProductVariant GID for ?variant=
+        // Or, rely on product.handle and let Shopify select the first available variant if direct variant linking by GID isn't straightforward.
+        // For now, using handle. If variant selection is critical, this needs refinement.
+        // The old variant.id was a number. New one is "gid://shopify/ProductVariant/NUMERIC_ID"
+        let variantNumericId = null;
+        if (variant.id && typeof variant.id === 'string' && variant.id.startsWith('gid://shopify/ProductVariant/')) {
+            variantNumericId = variant.id.substring('gid://shopify/ProductVariant/'.length);
+        }
+
+        cardLink.href = variantNumericId ? `/products/${product.handle}?variant=${variantNumericId}` : `/products/${product.handle}`;
+
 
         const imageContainer = document.createElement('div');
         imageContainer.className = 'fitment-product-image-container'; // For better image loading UX
 
         const imageElement = document.createElement('img');
         imageElement.className = 'fitment-product-image';
+        // Ensure imageUrl logic is robust for GraphQL structure (variant.featured_image.src from mapping)
         const imageUrl = variant.featured_image?.src || product.featured_image || 'https://placehold.co/180x120/e9ecef/6c757d?text=No+Image';
         imageElement.src = imageUrl;
         imageElement.alt = variant.featured_image?.alt || product.title || 'Product Image';
@@ -486,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const priceElement = document.createElement('div');
         priceElement.className = 'fitment-product-price';
-        priceElement.textContent = variant.price ? `$${(variant.price / 100).toFixed(2)}` : 'N/A';
+        priceElement.textContent = variant.price ? `$${(variant.price).toFixed(2)}` : 'N/A'; // Assuming price is now a direct decimal value
         infoElement.appendChild(priceElement);
 
         cardLink.appendChild(infoElement);
@@ -540,48 +677,69 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         elements.resultsContainer.appendChild(productGrid);
 
-        const shopifyDataPromises = fitmentProducts.map(gammaProduct => {
-            const sku = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : undefined;
-            const description = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_DESC] : undefined;
-            if (!sku) return Promise.reject({ reason: new Error('Missing SKU from API response'), sku: 'MISSING', description });
-            return fetchShopifyProductBySkuMultiStep(sku)
-                .then(shopifyResult => ({ sku, description, shopifyResult }))
-                .catch(error => { throw { reason: error, sku, description }; });
-        });
+        const skusWithDescriptions = fitmentProducts
+            .map(gammaProduct => ({
+                sku: gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : undefined,
+                description: gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_DESC] : undefined
+            }))
+            .filter(item => item.sku); // Ensure SKU is present
 
-        const shopifyResultsSettled = await Promise.allSettled(shopifyDataPromises);
+        if (skusWithDescriptions.length === 0) {
+            productGrid.innerHTML = ''; // Clear skeletons
+            elements.resultsContainer.innerHTML = '<p>No valid part SKUs to search for.</p>';
+            return;
+        }
+        
+        // Add a check for the Storefront API token before attempting to fetch
+        if (!SHOPIFY_STOREFRONT_ACCESS_TOKEN || SHOPIFY_STOREFRONT_ACCESS_TOKEN === 'YOUR_STOREFRONT_API_ACCESS_TOKEN_PLACEHOLDER') {
+            console.warn("Shopify Storefront API token is not set. Cannot fetch product data.");
+            productGrid.innerHTML = ''; // Clear skeletons
+            // Display all as unmatched
+            const fragment = document.createDocumentFragment();
+            skusWithDescriptions.forEach(item => {
+                fragment.appendChild(createUnmatchedSkuCard(item.sku, item.description));
+            });
+            productGrid.appendChild(fragment);
+            const summaryMessage = document.createElement('p');
+            summaryMessage.textContent = `Could not fetch product details: Storefront API access token is not configured. Please check the theme settings.`;
+            summaryMessage.style.textAlign = 'center';
+            summaryMessage.style.color = 'var(--fitment-error-color, red)';
+            summaryMessage.style.marginBottom = 'var(--fitment-spacing-sm)';
+            elements.resultsContainer.insertBefore(summaryMessage, productGrid);
+            return;
+        }
+
+
+        const shopifyProductsData = await fetchShopifyProductsBySkusGraphQL(skusWithDescriptions);
 
         // Clear skeletons before adding actual cards
         productGrid.innerHTML = '';
         let foundCount = 0, unmatchedCount = 0;
-
-        // Using a DocumentFragment for potentially better performance with many cards
         const fragment = document.createDocumentFragment();
 
-        shopifyResultsSettled.forEach(result => {
-            if (result.status === 'fulfilled') {
-                const { sku, description, shopifyResult } = result.value;
-                if (shopifyResult?.product && shopifyResult?.variant) {
-                    const productCardElement = createProductCard(shopifyResult.product, shopifyResult.variant);
-                    if (productCardElement) {
-                        foundCount++;
-                        fragment.appendChild(productCardElement);
-                    }
-                } else {
+        shopifyProductsData.forEach(item => {
+            // item structure: {sku, description, shopifyResult, error?}
+            if (item.shopifyResult && item.shopifyResult.product && item.shopifyResult.variant) {
+                const productCardElement = createProductCard(item.shopifyResult.product, item.shopifyResult.variant);
+                if (productCardElement) {
+                    foundCount++;
+                    fragment.appendChild(productCardElement);
+                } else { // Should not happen if product and variant are present
                     unmatchedCount++;
-                    fragment.appendChild(createUnmatchedSkuCard(sku, description));
+                    fragment.appendChild(createUnmatchedSkuCard(item.sku, item.description));
                 }
             } else {
                 unmatchedCount++;
-                const { sku = 'unknown', description = 'unknown', reason = 'Unknown error processing SKU' } = result.reason || {};
-                console.error(`Promise rejected for SKU '${sku}'. Reason:`, reason);
-                fragment.appendChild(createUnmatchedSkuCard(sku, description));
+                if (item.error) {
+                    console.warn(`Failed to fetch Shopify data for SKU ${item.sku}: ${item.error}`);
+                }
+                fragment.appendChild(createUnmatchedSkuCard(item.sku, item.description));
             }
         });
+        
+        productGrid.appendChild(fragment);
 
-        productGrid.appendChild(fragment); // Append all cards at once
-
-        if (foundCount === 0 && unmatchedCount === 0) { // Should not happen if fitmentProducts was not empty
+        if (foundCount === 0 && unmatchedCount === 0 && skusWithDescriptions.length > 0) {
              elements.resultsContainer.innerHTML = '<p>No products could be processed or displayed.</p>';
         } else if (foundCount === 0 && unmatchedCount > 0) {
             // Optionally, add a summary message if only unmatched SKUs were found
@@ -789,7 +947,7 @@ document.addEventListener('DOMContentLoaded', () => {
              category = parts[0].trim();
              if (parts.length > 1) { subCategory = parts.slice(1).join(' - ').trim(); }
         }
-        console.log(`Searching Parts: Type='${type}', Category='${category}', SubCategory='${subCategory}', Make='${make}', Year='${year}', Model='${model}'`);
+        // console.log(`Searching Parts: Type='${type}', Category='${category}', SubCategory='${subCategory}', Make='${make}', Year='${year}', Model='${model}'`);
         toggleLoading(elements.searchLoading, true);
         if(elements.findPartsButton) elements.findPartsButton.disabled = true; // Disable button during search
         clearError(sectionId);
