@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // IMPORTANT: Replace 'YOUR_STOREFRONT_API_ACCESS_TOKEN' with your actual Storefront API access token.
   // This token is typically public and used for client-side API requests.
   // Consider making this configurable via theme settings or a global Shopify JavaScript object if possible.
-  const SHOPIFY_STOREFRONT_ACCESS_TOKEN = section.dataset.storefrontApiToken || 'YOUR_STOREFRONT_API_ACCESS_TOKEN_PLACEHOLDER';
+  // const SHOPIFY_STOREFRONT_ACCESS_TOKEN = section.dataset.storefrontApiToken || 'YOUR_STOREFRONT_API_ACCESS_TOKEN_PLACEHOLDER'; // Moved inside forEach loop
   const SHOPIFY_GRAPHQL_URL = Shopify?.routes?.root ? (Shopify.routes.root.endsWith('/') ? Shopify.routes.root : Shopify.routes.root + '/') + 'api/2023-10/graphql.json' : '/api/2023-10/graphql.json';
   // Check if Choices library is loaded globally
   if (typeof Choices === 'undefined') {
@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
   fitmentSections.forEach((section) => {
     const sectionId = section.dataset.sectionId;
     const storageKey = `${STORAGE_KEY_PREFIX}${sectionId}`;
+    // Moved from outside the loop to ensure 'section' is defined.
+    // This token is read per section, assuming it might differ or be set dynamically.
+    const SHOPIFY_STOREFRONT_ACCESS_TOKEN = section.dataset.storefrontApiToken || 'YOUR_STOREFRONT_API_ACCESS_TOKEN_PLACEHOLDER';
 
     // --- Configuration & Element References ---
     const apiBaseUrl = section.dataset.apiBaseUrl;
