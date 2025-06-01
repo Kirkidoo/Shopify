@@ -1,0 +1,216 @@
+/*
+ * Product Arrival Dates Styles
+ *
+ * To include these styles in your Shopify theme, add the following line
+ * to your theme.liquid file, typically within the <head> section:
+ *
+ * {{ 'product-arrival-dates.css' | asset_url | stylesheet_tag }}
+ *
+ */
+
+/* Main Container */
+#product-arrival-dates {
+  margin: 15px 0;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+}
+
+/* Hide by default if no JS or error */
+#product-arrival-dates:not([data-state]) {
+  display: none;
+}
+
+/* Loading State */
+#product-arrival-dates[data-state="loading"] .product-arrival-dates__loading-indicator,
+#product-arrival-dates[data-state="error"] .product-arrival-dates__error-message,
+#product-arrival-dates[data-state="no-data"] .product-arrival-dates__no-data-message,
+#product-arrival-dates[data-state="critical-error"] .product-arrival-dates__error-message { /* Assuming critical error uses the same error element */
+  display: block; /* Or flex, depending on desired layout */
+}
+
+#product-arrival-dates .product-arrival-dates__loading-indicator,
+#product-arrival-dates .product-arrival-dates__error-message,
+#product-arrival-dates .product-arrival-dates__no-data-message,
+#product-arrival-dates .product-arrival-dates__content {
+  display: none; /* Hide all sections by default */
+}
+
+#product-arrival-dates[data-state="has-dates"] .product-arrival-dates__content {
+  display: block;
+}
+
+/* Basic styling for placeholder messages */
+.product-arrival-dates__loading-indicator,
+.product-arrival-dates__error-message,
+.product-arrival-dates__no-data-message {
+  padding: 10px;
+  text-align: center;
+}
+
+.product-arrival-dates__error-message {
+  color: #d9534f; /* Bootstrap danger color */
+  background-color: #f2dede;
+  border: 1px solid #ebccd1;
+  border-radius: 3px;
+}
+
+.product-arrival-dates__no-data-message {
+  color: #888;
+}
+
+/* Add a simple spinner for loading, if desired */
+.product-arrival-dates__loading-indicator::before {
+  content: "";
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(0,0,0,.1);
+  border-radius: 50%;
+  border-top-color: #333;
+  animation: product-arrival-spinner 0.6s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes product-arrival-spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Standard Layout */
+.product-arrival-dates__header {
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee;
+}
+
+.product-arrival-dates__title {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.product-arrival-dates__list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px 0;
+}
+
+.product-arrival-dates__item {
+  padding: 8px 0;
+  border-bottom: 1px dotted #f0f0f0;
+}
+
+.product-arrival-dates__item:last-child {
+  border-bottom: none;
+}
+
+.product-arrival-dates__date {
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.product-arrival-dates__qty {
+  color: #555;
+  margin-right: 8px;
+}
+
+.product-arrival-dates__status {
+  display: inline-block; /* To allow margin/padding if needed */
+}
+
+.product-arrival-dates__type {
+  font-size: 0.9em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #fff;
+  text-transform: capitalize; /* Or as needed */
+}
+
+.product-arrival-dates__type--confirmed {
+  background-color: #5cb85c; /* Bootstrap success */
+}
+
+.product-arrival-dates__type--estimated {
+  background-color: #f0ad4e; /* Bootstrap warning */
+}
+
+.product-arrival-dates__type--unknown {
+  background-color: #777; /* Bootstrap default/grey */
+}
+
+.product-arrival-dates__note {
+  font-size: 0.9em;
+  color: #777;
+  margin-top: 10px;
+  padding-top: 5px;
+  border-top: 1px solid #eee;
+}
+
+.product-arrival-dates__note p {
+  margin: 0;
+}
+
+/* Compact Layout Modifiers */
+#product-arrival-dates.product-arrival-dates--compact {
+  /* Specific adjustments for the compact container, if any */
+  padding: 8px;
+  border: none; /* Example: remove border for a more subtle look */
+  background-color: #f9f9f9; /* Example: slight background tint */
+}
+
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__title--compact {
+  font-size: 1em; /* Or `inherit` if you want it to match surrounding text */
+  font-weight: normal;
+  display: inline;
+  margin-right: 5px;
+}
+
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__list {
+  display: inline; /* Make list items flow inline */
+  margin: 0;
+}
+
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__item {
+  display: inline;
+  padding: 0;
+  border: none;
+  margin-right: 5px; /* Spacing between elements */
+}
+
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__date {
+  font-weight: normal; /* Less emphasis */
+}
+
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__qty {
+  font-size: 0.9em;
+}
+
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__status {
+  /* Adjustments if needed for inline display */
+}
+
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__type {
+  font-size: 0.8em;
+  padding: 1px 4px;
+}
+
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__note {
+  display: block; /* Ensure note is on its own line if present */
+  font-size: 0.8em;
+  margin-top: 5px;
+  padding: 0;
+  border: none;
+  text-align: left; /* Or center, depending on preference */
+}
+
+/* Hide header if it exists in compact mode but isn't specifically the compact title */
+#product-arrival-dates.product-arrival-dates--compact .product-arrival-dates__header {
+    display: none;
+}
