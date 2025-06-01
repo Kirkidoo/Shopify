@@ -442,145 +442,112 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /**
-     * Fetches Shopify product and variant data for a list of SKUs using a single GraphQL query.
-     */
-    const fetchShopifyProductsGraphQL = async (skus) => {
+    const fetchShopifyProductsBySkuAJAX = async (skus) => {
         if (!Array.isArray(skus) || skus.length === 0) {
             return new Map();
         }
 
-        const storefrontAccessToken = window.Shopify?.storefrontAccessToken;
-        if (!storefrontAccessToken) {
-            console.error('Shopify Storefront Access Token not found. Cannot fetch products.');
-            // Return a map where each SKU maps to an error or null
-            const errorResult = new Map();
-            skus.forEach(sku => errorResult.set(sku, { error: 'Storefront Access Token not found.' }));
-            return errorResult;
-        }
+        const uniqueNormalizedSkus = [...new Set(skus.map(sku => String(sku).trim().toLowerCase()).filter(sku => sku))];
 
-        const uniqueSkus = [...new Set(skus.map(sku => String(sku).trim()).filter(sku => sku))];
-        if (uniqueSkus.length === 0) {
+        if (uniqueNormalizedSkus.length === 0) {
             return new Map();
         }
 
-        const query = `
-            query GetProductsBySkus($query_string: String!, $numProducts: Int!) {
-              products(first: $numProducts, query: $query_string) {
-                edges {
-                  node {
-                    handle
-                    title
-                    featuredImage {
-                      url
-                      altText
+        // Stage 1: Fetch Product Handles in Parallel
+        const skuToHandleMap = new Map(); // Stores { sku => handle }
+        const handlePromises = uniqueNormalizedSkus.map(sku => {
+            const encodedSkuQuery = encodeURIComponent(`variants.sku:"${sku}"`);
+            const suggestUrl = `/search/suggest.json?q=${encodedSkuQuery}&resources[type]=product&resources[limit]=1&resources[options][unavailable_products]=show&resources[fields]=handle`;
+            return fetch(suggestUrl)
+                .then(response => {
+                    if (!response.ok) throw new Error(`Suggest API failed for SKU ${sku} with status ${response.status}`);
+                    return response.json();
+                })
+                .then(suggestions => {
+                    const products = suggestions?.resources?.results?.products;
+                    if (products && products.length > 0 && products[0].handle) {
+                        skuToHandleMap.set(sku, products[0].handle);
+                    } else {
+                        skuToHandleMap.set(sku, null); // No handle found
                     }
-                    variants(first: 250) {
-                      edges {
-                        node {
-                          id
-                          title
-                          sku
-                          availableForSale
-                          price {
-                            amount
-                            currencyCode
-                          }
-                          image {
-                            url
-                            altText
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-        `;
+                })
+                .catch(error => {
+                    console.error(`Fetch handle error for SKU ${sku}:`, error);
+                    skuToHandleMap.set(sku, null); // Mark as error or not found
+                });
+        });
 
-        const queryString = uniqueSkus.map(sku => `sku:${sku}`).join(" OR ");
-        const variables = {
-            query_string: queryString,
-            numProducts: uniqueSkus.length
-        };
+        await Promise.allSettled(handlePromises);
 
-        try {
-            const response = await fetch('/api/graphql.json', { // Using a relative path for the endpoint
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Shopify-Storefront-Access-Token': storefrontAccessToken,
-                },
-                body: JSON.stringify({ query, variables }),
-            });
+        // Stage 2: Fetch Product Data by Unique Handles in Parallel
+        const uniqueHandles = [...new Set(Array.from(skuToHandleMap.values()).filter(handle => handle))];
+        const productDataMap = new Map(); // Stores { handle => productJson }
 
-            if (!response.ok) {
-                const errorBody = await response.text();
-                console.error(`GraphQL request failed: ${response.status} ${response.statusText}`, errorBody);
-                throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
-            }
-
-            const jsonResponse = await response.json();
-            if (jsonResponse.errors) {
-                console.error('GraphQL API errors:', jsonResponse.errors);
-                throw new Error('GraphQL API returned errors.');
-            }
-
-            const productsData = jsonResponse.data?.products?.edges || [];
-            const results = new Map();
-
-            // Initialize results map with null for all requested SKUs to track which ones are found
-            uniqueSkus.forEach(sku => results.set(sku, null));
-
-            productsData.forEach(edge => {
-                const productNode = edge.node;
-                if (productNode && productNode.variants && productNode.variants.edges) {
-                    productNode.variants.edges.forEach(variantEdge => {
-                        const variantNode = variantEdge.node;
-                        const currentSku = String(variantNode.sku).trim();
-
-                        // If this SKU was requested, map it
-                        if (results.has(currentSku)) {
-                            // Adapt Shopify GraphQL structure to the structure expected by createProductCard
-                            // The original `fetchShopifyProductBySkuMultiStep` returned { product, variant }
-                            // where `product` was the full product.js and `variant` was a specific variant object.
-                            // We need to ensure `createProductCard` can handle this new structure.
-                            // It expects `product.title`, `product.handle`, `product.featured_image`
-                            // and `variant.id`, `variant.title`, `variant.sku`, `variant.available`, `variant.price`, `variant.featured_image`
-
-                            const adaptedProduct = {
-                                handle: productNode.handle,
-                                title: productNode.title,
-                                featured_image: productNode.featuredImage?.url, // Note: this was product.featured_image (string)
-                                // The original product object from .js had more fields, but createProductCard primarily uses these.
-                            };
-                            const adaptedVariant = {
-                                id: variantNode.id.split('/').pop(), // Get the numeric ID from gid://Shopify/ProductVariant/VARIANT_ID
-                                title: variantNode.title,
-                                sku: variantNode.sku,
-                                available: variantNode.availableForSale,
-                                price: parseFloat(variantNode.price.amount) * 100, // Assuming price is in cents as original
-                                featured_image: variantNode.image ? { src: variantNode.image.url, alt: variantNode.image.altText } : (productNode.featuredImage ? {src: productNode.featuredImage.url, alt: productNode.featuredImage.altText} : null),
-                                // Ensure `currencyCode` is available if needed, though createProductCard doesn't use it.
-                            };
-
-                            // If multiple SKUs map to the same product, this will overwrite.
-                            // However, the query is specific, so each variant.sku should be unique in the response matching a unique input SKU.
-                            results.set(currentSku, { product: adaptedProduct, variant: adaptedVariant });
-                        }
+        if (uniqueHandles.length > 0) {
+            const productPromises = uniqueHandles.map(handle => {
+                const productJsonUrl = `/products/${handle}.js`;
+                return fetch(productJsonUrl)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`Product API failed for handle ${handle} with status ${response.status}`);
+                        return response.json();
+                    })
+                    .then(productJson => {
+                        productDataMap.set(handle, productJson);
+                    })
+                    .catch(error => {
+                        console.error(`Fetch product JSON error for handle ${handle}:`, error);
+                        // productDataMap will not have an entry for this handle if fetch fails
                     });
-                }
             });
-            return results;
-
-        } catch (error) {
-            console.error('Error fetching or processing Shopify products via GraphQL:', error);
-            // In case of a total fetch failure, return a map with errors for all SKUs
-            const errorResult = new Map();
-            uniqueSkus.forEach(sku => errorResult.set(sku, { error: error.message || 'Failed to fetch product data.' }));
-            return errorResult;
+            await Promise.allSettled(productPromises);
         }
+
+        // Stage 3: Process Results and Map Back to Original SKUs
+        const resultsMap = new Map();
+
+        for (const sku of uniqueNormalizedSkus) {
+            const handle = skuToHandleMap.get(sku);
+            if (!handle) {
+                resultsMap.set(sku, { error: `Product handle not found for SKU: ${sku}` });
+                continue;
+            }
+
+            const productJson = productDataMap.get(handle);
+            if (!productJson) {
+                resultsMap.set(sku, { error: `Product data not found for handle: ${handle} (SKU: ${sku})` });
+                continue;
+            }
+
+            if (productJson && Array.isArray(productJson.variants)) {
+                const matchingVariant = productJson.variants.find(v => v.sku && String(v.sku).trim().toLowerCase() === sku);
+                if (matchingVariant) {
+                    // Adapt data for createProductCard
+                    // product.featured_image (URL string)
+                    // variant.featured_image (object {src, alt} or null)
+                    // variant.price (number in cents)
+                    // variant.id (number or string)
+                    const adaptedProduct = {
+                        handle: productJson.handle,
+                        title: productJson.title,
+                        featured_image: productJson.featured_image, // This is typically a URL string
+                    };
+                    const adaptedVariant = {
+                        id: matchingVariant.id,
+                        title: matchingVariant.title,
+                        sku: matchingVariant.sku,
+                        available: matchingVariant.available,
+                        price: matchingVariant.price, // Already in cents from product.js
+                        featured_image: matchingVariant.featured_image || null, // featured_image is an object { src, alt, ... } or null
+                    };
+                    resultsMap.set(sku, { product: adaptedProduct, variant: adaptedVariant });
+                } else {
+                    resultsMap.set(sku, { error: `Variant with SKU ${sku} not found in product ${productJson.handle}` });
+                }
+            } else {
+                resultsMap.set(sku, { error: `Invalid product data or no variants for SKU ${sku} (handle: ${handle})` });
+            }
+        }
+        return resultsMap;
     };
 
     /** Creates an HTML product card element. Adds 'card-fade-in' class for animation. */
@@ -692,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Fetch all Shopify product data in one go
-        const shopifyProductsMap = await fetchShopifyProductsGraphQL(allSkus);
+        const shopifyProductsMap = await fetchShopifyProductsBySkuAJAX(allSkus);
 
         // Clear skeletons before adding actual cards
         productGrid.innerHTML = '';
@@ -726,13 +693,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 unmatchedCount++;
                 if (shopifyResult && shopifyResult.error) {
                      console.error(`Error fetching Shopify data for SKU ${sku}: ${shopifyResult.error}`);
-                     if (shopifyResult.error === 'Storefront Access Token not found.' && elements.errorMessageContainer) {
-                        // Check if the specific error message isn't already displayed to avoid duplicates.
-                        const errorContainer = document.querySelector(`#fitment-error-message-${sectionId}`);
-                        if (errorContainer && !errorContainer.textContent.includes('Shopify Storefront Access Token is missing')) {
-                            displayError('Critical: Shopify Storefront Access Token is missing. Product information cannot be displayed. Please check theme settings.', sectionId);
-                        }
-                     }
                 }
                 fragment.appendChild(createUnmatchedSkuCard(sku, description));
             }
