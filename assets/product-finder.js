@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return item.value;
         } catch (e) {
-            console.error(`Error reading from sessionStorage key ${cacheKey}:`, e);
+            console.error(`Error reading from cache key ${cacheKey}:`, e);
             try { sessionStorage.removeItem(cacheKey); } catch (removeError) {}
             return null;
         }
@@ -108,36 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             sessionStorage.setItem(cacheKey, JSON.stringify(item));
         } catch (e) {
-            console.error(`Error setting sessionStorage key ${cacheKey}:`, e);
-        }
-    };
-
-    const getLocalStorageCache = (key, currentSectionId) => {
-        const cacheKey = `${CACHE_PREFIX}${currentSectionId}_${key}`;
-        try {
-            const itemStr = localStorage.getItem(cacheKey);
-            if (!itemStr) return null;
-            const item = JSON.parse(itemStr);
-            if (new Date().getTime() > item.expiry) {
-                localStorage.removeItem(cacheKey);
-                console.log(`localStorage cache expired for key: ${cacheKey}`);
-                return null;
-            }
-            return item.value;
-        } catch (e) {
-            console.error(`Error reading from localStorage key ${cacheKey}:`, e);
-            try { localStorage.removeItem(cacheKey); } catch (removeError) {}
-            return null;
-        }
-    };
-
-    const setLocalStorageCache = (key, value, currentSectionId) => {
-        const cacheKey = `${CACHE_PREFIX}${currentSectionId}_${key}`;
-        const item = { value: value, expiry: new Date().getTime() + CACHE_EXPIRY_MS };
-        try {
-            localStorage.setItem(cacheKey, JSON.stringify(item));
-        } catch (e) {
-            console.error(`Error setting localStorage key ${cacheKey}:`, e);
+            console.error(`Error setting cache key ${cacheKey}:`, e);
         }
     };
 
@@ -309,17 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const resetAllSelectorsAndResults = () => {
       console.log(`Resetting all selectors for section ${sectionId}`);
-      clearCache(); // Clears section-specific sessionStorage
-
-      // Explicitly clear the 'types' data from localStorage for this section
-      try {
-          const typesCacheKey = `${CACHE_PREFIX}${sectionId}_types`;
-          localStorage.removeItem(typesCacheKey);
-          console.log(`Cleared types from localStorage for section ${sectionId}`);
-      } catch (e) {
-          console.warn(`Could not clear types from localStorage for section ${sectionId}:`, e);
-      }
-
+      clearCache();
       try {
           localStorage.removeItem(LAST_SELECTED_VEHICLE_STORAGE_KEY);
           console.log(`Cleared last selected vehicle from localStorage.`);
@@ -327,9 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
           console.warn(`Could not clear last selected vehicle from localStorage:`, e);
       }
 
-      // Attempt to load types from localStorage first for repopulation after reset,
-      // otherwise, it will be fetched in initialize()
-      const originalTypeOptions = getLocalStorageCache('types', sectionId) || [];
+      const originalTypeOptions = getCache('types') || [];
 
       resetSelect(elements.typeSelect, PLACEHOLDERS.TYPE, originalTypeOptions.length === 0);
       if (originalTypeOptions.length > 0) {
@@ -442,112 +401,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const fetchShopifyProductsBySkuAJAX = async (skus) => {
-        if (!Array.isArray(skus) || skus.length === 0) {
-            return new Map();
-        }
-
-        const uniqueNormalizedSkus = [...new Set(skus.map(sku => String(sku).trim().toLowerCase()).filter(sku => sku))];
-
-        if (uniqueNormalizedSkus.length === 0) {
-            return new Map();
-        }
-
-        // Stage 1: Fetch Product Handles in Parallel
-        const skuToHandleMap = new Map(); // Stores { sku => handle }
-        const handlePromises = uniqueNormalizedSkus.map(sku => {
-            const encodedSkuQuery = encodeURIComponent(`variants.sku:"${sku}"`);
+    /**
+     * Fetches Shopify product/variant data by SKU.
+     * PERFORMANCE NOTE: This makes two requests per SKU. If the Shopify API supports
+     * batch fetching products by multiple SKUs or handles, that would be more performant.
+     * Consider investigating Shopify's GraphQL API for batch operations if performance becomes an issue.
+     */
+    const fetchShopifyProductBySkuMultiStep = async (sku) => {
+        if (!sku) return null;
+        const normalizedSku = String(sku).trim().toLowerCase();
+        if (!normalizedSku) return null;
+        let productHandle = null;
+        try {
+            const encodedSkuQuery = encodeURIComponent(`variants.sku:"${normalizedSku}"`);
+            // Fetching minimal data: only handle
             const suggestUrl = `/search/suggest.json?q=${encodedSkuQuery}&resources[type]=product&resources[limit]=1&resources[options][unavailable_products]=show&resources[fields]=handle`;
-            return fetch(suggestUrl)
-                .then(response => {
-                    if (!response.ok) throw new Error(`Suggest API failed for SKU ${sku} with status ${response.status}`);
-                    return response.json();
-                })
-                .then(suggestions => {
-                    const products = suggestions?.resources?.results?.products;
-                    if (products && products.length > 0 && products[0].handle) {
-                        skuToHandleMap.set(sku, products[0].handle);
-                    } else {
-                        skuToHandleMap.set(sku, null); // No handle found
+            const suggestResponse = await fetch(suggestUrl);
+            if (suggestResponse.ok) {
+                const suggestions = await suggestResponse.json();
+                const products = suggestions?.resources?.results?.products;
+                if (products && products.length > 0) productHandle = products[0].handle;
+            }
+        } catch (error) { console.error(`Shopify suggest fetch error for SKU ${normalizedSku}:`, error); }
+
+        if (productHandle) {
+            try {
+                const productJsonUrl = `/products/${productHandle}.js`;
+                const productResponse = await fetch(productJsonUrl);
+                if (productResponse.ok) {
+                    const fullProductData = await productResponse.json();
+                    if (fullProductData && Array.isArray(fullProductData.variants)) {
+                        const matchingVariant = fullProductData.variants.find(v => v.sku && String(v.sku).trim().toLowerCase() === normalizedSku);
+                        if (matchingVariant) return { product: fullProductData, variant: matchingVariant };
                     }
-                })
-                .catch(error => {
-                    console.error(`Fetch handle error for SKU ${sku}:`, error);
-                    skuToHandleMap.set(sku, null); // Mark as error or not found
-                });
-        });
-
-        await Promise.allSettled(handlePromises);
-
-        // Stage 2: Fetch Product Data by Unique Handles in Parallel
-        const uniqueHandles = [...new Set(Array.from(skuToHandleMap.values()).filter(handle => handle))];
-        const productDataMap = new Map(); // Stores { handle => productJson }
-
-        if (uniqueHandles.length > 0) {
-            const productPromises = uniqueHandles.map(handle => {
-                const productJsonUrl = `/products/${handle}.js`;
-                return fetch(productJsonUrl)
-                    .then(response => {
-                        if (!response.ok) throw new Error(`Product API failed for handle ${handle} with status ${response.status}`);
-                        return response.json();
-                    })
-                    .then(productJson => {
-                        productDataMap.set(handle, productJson);
-                    })
-                    .catch(error => {
-                        console.error(`Fetch product JSON error for handle ${handle}:`, error);
-                        // productDataMap will not have an entry for this handle if fetch fails
-                    });
-            });
-            await Promise.allSettled(productPromises);
-        }
-
-        // Stage 3: Process Results and Map Back to Original SKUs
-        const resultsMap = new Map();
-
-        for (const sku of uniqueNormalizedSkus) {
-            const handle = skuToHandleMap.get(sku);
-            if (!handle) {
-                resultsMap.set(sku, { error: `Product handle not found for SKU: ${sku}` });
-                continue;
-            }
-
-            const productJson = productDataMap.get(handle);
-            if (!productJson) {
-                resultsMap.set(sku, { error: `Product data not found for handle: ${handle} (SKU: ${sku})` });
-                continue;
-            }
-
-            if (productJson && Array.isArray(productJson.variants)) {
-                const matchingVariant = productJson.variants.find(v => v.sku && String(v.sku).trim().toLowerCase() === sku);
-                if (matchingVariant) {
-                    // Adapt data for createProductCard
-                    // product.featured_image (URL string)
-                    // variant.featured_image (object {src, alt} or null)
-                    // variant.price (number in cents)
-                    // variant.id (number or string)
-                    const adaptedProduct = {
-                        handle: productJson.handle,
-                        title: productJson.title,
-                        featured_image: productJson.featured_image, // This is typically a URL string
-                    };
-                    const adaptedVariant = {
-                        id: matchingVariant.id,
-                        title: matchingVariant.title,
-                        sku: matchingVariant.sku,
-                        available: matchingVariant.available,
-                        price: matchingVariant.price, // Already in cents from product.js
-                        featured_image: matchingVariant.featured_image || null, // featured_image is an object { src, alt, ... } or null
-                    };
-                    resultsMap.set(sku, { product: adaptedProduct, variant: adaptedVariant });
-                } else {
-                    resultsMap.set(sku, { error: `Variant with SKU ${sku} not found in product ${productJson.handle}` });
                 }
-            } else {
-                resultsMap.set(sku, { error: `Invalid product data or no variants for SKU ${sku} (handle: ${handle})` });
-            }
+            } catch (error) { console.error(`Shopify product JSON fetch error for handle ${productHandle}:`, error); }
         }
-        return resultsMap;
+        return null;
     };
 
     /** Creates an HTML product card element. Adds 'card-fade-in' class for animation. */
@@ -634,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const displayResults = async (fitmentProducts) => {
         if (!elements.resultsContainer) return;
-        elements.resultsContainer.innerHTML = ''; // Clear previous results
+        elements.resultsContainer.innerHTML = ''; // Clear previous results or "select vehicle" message
 
         if (!Array.isArray(fitmentProducts) || fitmentProducts.length === 0) {
             elements.resultsContainer.innerHTML = '<p>No matching part numbers found for the selected vehicle.</p>';
@@ -650,108 +540,58 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         elements.resultsContainer.appendChild(productGrid);
 
-        const allSkus = fitmentProducts.map(gammaProduct => gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : null).filter(sku => sku);
+        const shopifyDataPromises = fitmentProducts.map(gammaProduct => {
+            const sku = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : undefined;
+            const description = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_DESC] : undefined;
+            if (!sku) return Promise.reject({ reason: new Error('Missing SKU from API response'), sku: 'MISSING', description });
+            return fetchShopifyProductBySkuMultiStep(sku)
+                .then(shopifyResult => ({ sku, description, shopifyResult }))
+                .catch(error => { throw { reason: error, sku, description }; });
+        });
 
-        if (allSkus.length === 0) {
-            productGrid.innerHTML = ''; // Clear skeletons
-            elements.resultsContainer.innerHTML = '<p>No valid SKUs found in the product list to search.</p>';
-            return;
-        }
-
-        // Fetch all Shopify product data in one go
-        const shopifyProductsMap = await fetchShopifyProductsBySkuAJAX(allSkus);
+        const shopifyResultsSettled = await Promise.allSettled(shopifyDataPromises);
 
         // Clear skeletons before adding actual cards
         productGrid.innerHTML = '';
         let foundCount = 0, unmatchedCount = 0;
+
+        // Using a DocumentFragment for potentially better performance with many cards
         const fragment = document.createDocumentFragment();
 
-        fitmentProducts.forEach(gammaProduct => {
-            const sku = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : undefined;
-            const description = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_DESC] : undefined;
-
-            if (!sku) {
-                console.warn('Gamma product entry missing SKU, skipping:', gammaProduct);
-                // Potentially create an "error" card for this case if desired
-                // fragment.appendChild(createUnmatchedSkuCard('MISSING_SKU', description || 'Product data incomplete'));
-                // unmatchedCount++;
-                return;
-            }
-
-            const shopifyResult = shopifyProductsMap.get(String(sku).trim());
-
-            if (shopifyResult && shopifyResult.product && shopifyResult.variant) {
-                const productCardElement = createProductCard(shopifyResult.product, shopifyResult.variant);
-                if (productCardElement) {
-                    foundCount++;
-                    fragment.appendChild(productCardElement);
-                } else { // Should not happen if shopifyResult.product and .variant are valid
+        shopifyResultsSettled.forEach(result => {
+            if (result.status === 'fulfilled') {
+                const { sku, description, shopifyResult } = result.value;
+                if (shopifyResult?.product && shopifyResult?.variant) {
+                    const productCardElement = createProductCard(shopifyResult.product, shopifyResult.variant);
+                    if (productCardElement) {
+                        foundCount++;
+                        fragment.appendChild(productCardElement);
+                    }
+                } else {
                     unmatchedCount++;
                     fragment.appendChild(createUnmatchedSkuCard(sku, description));
                 }
             } else {
                 unmatchedCount++;
-                if (shopifyResult && shopifyResult.error) {
-                     console.error(`Error fetching Shopify data for SKU ${sku}: ${shopifyResult.error}`);
-                }
+                const { sku = 'unknown', description = 'unknown', reason = 'Unknown error processing SKU' } = result.reason || {};
+                console.error(`Promise rejected for SKU '${sku}'. Reason:`, reason);
                 fragment.appendChild(createUnmatchedSkuCard(sku, description));
             }
         });
 
         productGrid.appendChild(fragment); // Append all cards at once
 
-        // Do not overwrite the critical token error if it was just displayed.
-        const errorContainer = document.querySelector(`#fitment-error-message-${sectionId}`);
-        const isTokenErrorDisplayed = errorContainer && errorContainer.textContent.includes('Shopify Storefront Access Token is missing');
-
-        if (!isTokenErrorDisplayed) {
-            if (foundCount === 0 && unmatchedCount === 0 && fitmentProducts.length > 0) {
-                 elements.resultsContainer.innerHTML = '<p>No products could be processed or displayed.</p>';
-            } else if (foundCount === 0 && unmatchedCount > 0) {
-                const summaryMessage = document.createElement('p');
-                summaryMessage.textContent = `Found ${unmatchedCount} part number(s) that are not currently available in this store or could not be retrieved.`;
-                summaryMessage.style.textAlign = 'center';
-                summaryMessage.style.marginBottom = 'var(--fitment-spacing-sm)';
-                elements.resultsContainer.insertBefore(summaryMessage, productGrid);
-            }
-        } else if (productGrid.children.length === 0 && foundCount === 0 && unmatchedCount > 0) {
-            // If token error IS displayed, and no product cards were added (only unmatched),
-            // ensure the grid itself is cleared or hidden to prevent empty space or only unmatched cards showing confusingly.
-            // The error message itself is the primary feedback in this case.
-            productGrid.innerHTML = ''; // Clear any unmatched cards if the token error is the main issue.
-            // Optionally, add a small note that no products could be checked.
-            const note = document.createElement('p');
-            note.textContent = "Product details could not be checked due to the missing token.";
-            note.style.textAlign = 'center';
-            elements.resultsContainer.appendChild(note);
-
-        } else if (isTokenErrorDisplayed && foundCount === 0 && unmatchedCount > 0) {
-             // If token error is displayed, and we only have unmatched cards, we might want to suppress the generic "Found X part numbers not available"
-             // because the primary error is the token.
-             // We can clear the productGrid if it only contains unmatched cards.
-             let onlyUnmatched = true;
-             for(const child of productGrid.childNodes) {
-                 if (!child.classList || !child.classList.contains('fitment-product-not-found')) {
-                     onlyUnmatched = false;
-                     break;
-                 }
-             }
-             if(onlyUnmatched) {
-                 productGrid.innerHTML = '';
-                 const summaryMessage = document.createElement('p');
-                 summaryMessage.textContent = `Additionally, ${unmatchedCount} other part(s) were processed but could not be matched or found in the store.`;
-                 summaryMessage.style.textAlign = 'center';
-                 summaryMessage.style.marginTop = '10px'; // Add some space from the main error
-                 elements.resultsContainer.appendChild(summaryMessage);
-             }
-        } else if (foundCount === 0 && unmatchedCount > 0) { // This condition might be redundant due to above, but kept for safety.
+        if (foundCount === 0 && unmatchedCount === 0) { // Should not happen if fitmentProducts was not empty
+             elements.resultsContainer.innerHTML = '<p>No products could be processed or displayed.</p>';
+        } else if (foundCount === 0 && unmatchedCount > 0) {
+            // Optionally, add a summary message if only unmatched SKUs were found
             const summaryMessage = document.createElement('p');
-            summaryMessage.textContent = `Found ${unmatchedCount} part number(s) that are not currently available in this store or could not be retrieved.`;
+            summaryMessage.textContent = `Found ${unmatchedCount} part number(s) that are not currently available in this store.`;
             summaryMessage.style.textAlign = 'center';
             summaryMessage.style.marginBottom = 'var(--fitment-spacing-sm)';
             elements.resultsContainer.insertBefore(summaryMessage, productGrid);
         }
-        // If productGrid is already appended and populated, no need to clear resultsContainer again
+         // If productGrid is already appended and populated, no need to clear resultsContainer again
     };
 
     // --- Event Listeners ---
@@ -1011,68 +851,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     const initialize = async () => {
-        let initializationError = false;
+        toggleLoading(elements.typeLoading, true);
+        clearError(sectionId);
+        resetSelect(elements.categorySelect, PLACEHOLDERS.CATEGORY, true);
+        resetSelect(elements.makeSelect, PLACEHOLDERS.MAKE, true);
+        resetSelect(elements.yearSelect, PLACEHOLDERS.YEAR, true);
+        resetSelect(elements.modelSelect, PLACEHOLDERS.MODEL, true);
+        if(elements.findPartsButton) elements.findPartsButton.disabled = true;
+
+        const cacheKey = 'types';
+        const cachedData = getCache(cacheKey);
         try {
-            toggleLoading(elements.typeLoading, true);
-            clearError(sectionId);
-            resetSelect(elements.categorySelect, PLACEHOLDERS.CATEGORY, true);
-            resetSelect(elements.makeSelect, PLACEHOLDERS.MAKE, true);
-            resetSelect(elements.yearSelect, PLACEHOLDERS.YEAR, true);
-            resetSelect(elements.modelSelect, PLACEHOLDERS.MODEL, true);
-            if(elements.findPartsButton) elements.findPartsButton.disabled = true;
-
-            const cacheKey = 'types';
-            let typesData = getLocalStorageCache(cacheKey, sectionId);
-            let apiResponse; // Declare apiResponse here to be accessible after the if/else
-
-            if (typesData) {
-                apiResponse = { [API_RESPONSE_KEYS.TYPES]: typesData };
-                console.log(`Loaded types from localStorage for section ${sectionId}`);
-            } else {
-                console.log(`Types not found in localStorage for section ${sectionId}, fetching from API.`);
-                try {
-                    if (!apiEndpoints.types) throw new Error("Types API endpoint URL is missing in configuration.");
-                    const fetchedApiResponse = await fetchAPI(apiEndpoints.types);
-                    typesData = fetchedApiResponse?.[API_RESPONSE_KEYS.TYPES] || fetchedApiResponse || [];
-                    if (!Array.isArray(typesData)) throw new Error('Invalid types data format received from API after fetch.');
-                    setLocalStorageCache(cacheKey, typesData, sectionId);
-                    apiResponse = { [API_RESPONSE_KEYS.TYPES]: typesData };
-                } catch (error) {
-                    console.error(`initialize: Error caught during type fetching for section ${sectionId}:`, error);
-                    displayError(`Initialization failed: Could not load vehicle types. ${error.message}`, sectionId);
-                    initializationError = true;
-                }
+            let apiResponse = cachedData ? { [API_RESPONSE_KEYS.TYPES]: cachedData } : null;
+            if (!apiResponse) {
+                if (!apiEndpoints.types) throw new Error("Types API endpoint URL is missing in configuration.");
+                apiResponse = await fetchAPI(apiEndpoints.types);
+                const typesToCache = apiResponse?.[API_RESPONSE_KEYS.TYPES] || apiResponse || [];
+                setCache(cacheKey, Array.isArray(typesToCache) ? typesToCache : []);
             }
-
-            if (initializationError) {
-                 disableAllSelectors();
-                 // No return here, let finally handle the loader. The rest of the function will be skipped effectively.
+            const data = apiResponse?.[API_RESPONSE_KEYS.TYPES] || apiResponse || [];
+            if (!Array.isArray(data)) throw new Error('Invalid types data format received from API.');
+            const sortedTypes = data.sort((a, b) => a.localeCompare(b));
+            populateSelect(elements.typeSelect, sortedTypes);
+            if (sortedTypes.length === 0) {
+                displayError("No vehicle types are currently available. Please check back later.", sectionId);
+                disableAllSelectors();
             }
-
-            // Proceed only if no critical initialization error occurred
-            if (!initializationError) {
-                const data = apiResponse?.[API_RESPONSE_KEYS.TYPES] || [];
-                if (!Array.isArray(data)) { // This check is important
-                     console.error(`initialize: Types data is not an array for section ${sectionId}. Data:`, data);
-                     displayError(`Initialization failed: Invalid types data structure.`, sectionId);
-                     disableAllSelectors();
-                     initializationError = true; // Mark as error to prevent further processing
-                }
-
-                if (!initializationError) {
-                    const sortedTypes = data.sort((a, b) => a.localeCompare(b));
-                    populateSelect(elements.typeSelect, sortedTypes);
-
-                    if (sortedTypes.length === 0) { // Only show "No vehicle types" if data array was valid but empty
-                        displayError("No vehicle types are currently available. Please check back later.", sectionId);
-                        disableAllSelectors();
-                    }
-                }
-            }
-        } catch (mainError) {
-            console.error(`Critical error during fitment selector initialization (${sectionId}):`, mainError);
-            displayError(`An unexpected error occurred during initialization. Please try refreshing the page.`, sectionId);
-            disableAllSelectors(); // Ensure selectors are disabled on any unexpected error
+        } catch (error) {
+            console.error(`initialize: Error caught during type fetching for section ${sectionId}:`, error);
+            displayError(`Initialization failed: Could not load vehicle types. ${error.message}`, sectionId);
+            disableAllSelectors();
         } finally {
             toggleLoading(elements.typeLoading, false);
         }
@@ -1083,3 +891,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }); // End forEach loop
 
 }); // End DOMContentLoaded
+
+/**
+ * SCRIPT LOADING NOTE:
+ * For optimal performance, ensure this script and any dependencies like Choices.js
+ * are loaded with the `defer` attribute in your theme's main layout file (e.g., theme.liquid).
+ * Example: <script src="{{ 'product-finder.js' | asset_url }}" defer></script>
+ */

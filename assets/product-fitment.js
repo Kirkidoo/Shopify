@@ -82,17 +82,6 @@
           // Add unique ID to the list for aria-controls
           resultsContainer.innerHTML = `<ul class="product-fitment__list" id="product-fitment-results-list-${sectionId}">${listHtml}</ul>`;
           if (sectionWrapper) sectionWrapper.dataset.fitmentEmpty = 'false'; // Mark as not empty
-
-          // --- Add class for fade-in animation ---
-          const listElement = resultsContainer.querySelector('.product-fitment__list');
-          if (listElement) {
-            // Using requestAnimationFrame to ensure the element is in the DOM and painted
-            // before the class is added, allowing the CSS animation to play.
-            requestAnimationFrame(() => {
-              listElement.classList.add('product-fitment__list--loaded');
-            });
-          }
-          // --- End animation logic ---
         };
 
         // Helper to escape HTML characters
