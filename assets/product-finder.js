@@ -1051,54 +1051,69 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     const initialize = async () => {
-        toggleLoading(elements.typeLoading, true);
-        clearError(sectionId);
-        resetSelect(elements.categorySelect, PLACEHOLDERS.CATEGORY, true);
-        resetSelect(elements.makeSelect, PLACEHOLDERS.MAKE, true);
-        resetSelect(elements.yearSelect, PLACEHOLDERS.YEAR, true);
-        resetSelect(elements.modelSelect, PLACEHOLDERS.MODEL, true);
-        if(elements.findPartsButton) elements.findPartsButton.disabled = true;
+        let initializationError = false;
+        try {
+            toggleLoading(elements.typeLoading, true);
+            clearError(sectionId);
+            resetSelect(elements.categorySelect, PLACEHOLDERS.CATEGORY, true);
+            resetSelect(elements.makeSelect, PLACEHOLDERS.MAKE, true);
+            resetSelect(elements.yearSelect, PLACEHOLDERS.YEAR, true);
+            resetSelect(elements.modelSelect, PLACEHOLDERS.MODEL, true);
+            if(elements.findPartsButton) elements.findPartsButton.disabled = true;
 
-        const cacheKey = 'types'; // Key for types data
-        let typesData = getLocalStorageCache(cacheKey, sectionId);
-        let apiResponse;
+            const cacheKey = 'types';
+            let typesData = getLocalStorageCache(cacheKey, sectionId);
+            let apiResponse; // Declare apiResponse here to be accessible after the if/else
 
-        if (typesData) {
-            apiResponse = { [API_RESPONSE_KEYS.TYPES]: typesData };
-            console.log(`Loaded types from localStorage for section ${sectionId}`);
-        } else {
-            console.log(`Types not found in localStorage for section ${sectionId}, fetching from API.`);
-            try {
-                if (!apiEndpoints.types) throw new Error("Types API endpoint URL is missing in configuration.");
-                const fetchedApiResponse = await fetchAPI(apiEndpoints.types);
-                typesData = fetchedApiResponse?.[API_RESPONSE_KEYS.TYPES] || fetchedApiResponse || [];
-                if (!Array.isArray(typesData)) throw new Error('Invalid types data format received from API after fetch.');
-                setLocalStorageCache(cacheKey, typesData, sectionId);
+            if (typesData) {
                 apiResponse = { [API_RESPONSE_KEYS.TYPES]: typesData };
-            } catch (error) {
-                console.error(`initialize: Error caught during type fetching for section ${sectionId}:`, error);
-                displayError(`Initialization failed: Could not load vehicle types. ${error.message}`, sectionId);
-                disableAllSelectors();
-                toggleLoading(elements.typeLoading, false);
-                return; // Stop initialization if types can't be loaded
+                console.log(`Loaded types from localStorage for section ${sectionId}`);
+            } else {
+                console.log(`Types not found in localStorage for section ${sectionId}, fetching from API.`);
+                try {
+                    if (!apiEndpoints.types) throw new Error("Types API endpoint URL is missing in configuration.");
+                    const fetchedApiResponse = await fetchAPI(apiEndpoints.types);
+                    typesData = fetchedApiResponse?.[API_RESPONSE_KEYS.TYPES] || fetchedApiResponse || [];
+                    if (!Array.isArray(typesData)) throw new Error('Invalid types data format received from API after fetch.');
+                    setLocalStorageCache(cacheKey, typesData, sectionId);
+                    apiResponse = { [API_RESPONSE_KEYS.TYPES]: typesData };
+                } catch (error) {
+                    console.error(`initialize: Error caught during type fetching for section ${sectionId}:`, error);
+                    displayError(`Initialization failed: Could not load vehicle types. ${error.message}`, sectionId);
+                    initializationError = true;
+                }
             }
-        }
 
-        const data = apiResponse?.[API_RESPONSE_KEYS.TYPES] || []; // Ensure data is an array
-        if (!Array.isArray(data)) { // Should be caught by earlier checks, but as a safeguard
-             console.error(`initialize: Types data is not an array for section ${sectionId}. Data:`, data);
-             displayError(`Initialization failed: Invalid types data structure.`, sectionId);
-             disableAllSelectors();
-             toggleLoading(elements.typeLoading, false);
-             return;
-        }
-            const sortedTypes = data.sort((a, b) => a.localeCompare(b));
-            populateSelect(elements.typeSelect, sortedTypes);
-            if (sortedTypes.length === 0) {
-                displayError("No vehicle types are currently available. Please check back later.", sectionId);
-                disableAllSelectors();
+            if (initializationError) {
+                 disableAllSelectors();
+                 // No return here, let finally handle the loader. The rest of the function will be skipped effectively.
             }
-        } finally { // Error handling for API fetch is now inside the 'else' block
+
+            // Proceed only if no critical initialization error occurred
+            if (!initializationError) {
+                const data = apiResponse?.[API_RESPONSE_KEYS.TYPES] || [];
+                if (!Array.isArray(data)) { // This check is important
+                     console.error(`initialize: Types data is not an array for section ${sectionId}. Data:`, data);
+                     displayError(`Initialization failed: Invalid types data structure.`, sectionId);
+                     disableAllSelectors();
+                     initializationError = true; // Mark as error to prevent further processing
+                }
+
+                if (!initializationError) {
+                    const sortedTypes = data.sort((a, b) => a.localeCompare(b));
+                    populateSelect(elements.typeSelect, sortedTypes);
+
+                    if (sortedTypes.length === 0) { // Only show "No vehicle types" if data array was valid but empty
+                        displayError("No vehicle types are currently available. Please check back later.", sectionId);
+                        disableAllSelectors();
+                    }
+                }
+            }
+        } catch (mainError) {
+            console.error(`Critical error during fitment selector initialization (${sectionId}):`, mainError);
+            displayError(`An unexpected error occurred during initialization. Please try refreshing the page.`, sectionId);
+            disableAllSelectors(); // Ensure selectors are disabled on any unexpected error
+        } finally {
             toggleLoading(elements.typeLoading, false);
         }
     };
