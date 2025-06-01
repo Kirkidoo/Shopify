@@ -1,0 +1,221 @@
+{% comment %}
+  Global dynamic styles
+
+  Usage:
+  {% render 'head-css' %}
+{% endcomment %}
+
+{% liquid
+  assign font_medium = settings.typography_body | font_modify: 'weight', '500'
+  assign font_semibold = settings.typography_body | font_modify: 'weight', '600'
+  assign font_weight_bolder = 'bolder'
+
+  assign buttons_border_radius = 2
+  if settings.buttons_shape == 'square'
+    assign buttons_border_radius = 0
+  elsif settings.buttons_shape == 'pill'
+    assign buttons_border_radius = 24
+  endif
+
+  assign buttons_font_family = settings.typography_body.family | append: ',' | append: settings.typography_body.fallback_families
+  if settings.buttons_font == 'headings'
+    assign buttons_font_family = settings.typography_headings.family | append: ',' | append: settings.typography_headings.fallback_families
+  endif
+
+  assign headings_transform = 'none'
+  if settings.typography_headings_uppercase == true
+    assign headings_transform = 'uppercase'
+  endif
+
+  assign buttons_transform = 'none'
+  if settings.buttons_uppercase == true
+    assign buttons_transform = 'uppercase'
+  endif
+
+  assign badges_transform = 'none'
+  if settings.badges_uppercase == true
+    assign badges_transform = 'uppercase'
+  endif
+
+  assign headings_spacing = settings.typography_headings_spacing | divided_by: 100.0
+%}
+
+{% style %}
+  {{ settings.typography_body | font_face: font_display: 'swap' }}
+  {{ settings.typography_body | font_modify: 'weight', 'bold' | font_face: font_display: 'swap' }}
+  {{ settings.typography_body | font_modify: 'style', 'italic' | font_face: font_display: 'swap' }}
+  {{ settings.typography_body | font_modify: 'weight', 'bold' | font_modify: 'style', 'italic' | font_face: font_display: 'swap' }}
+  {{ settings.typography_headings | font_face: font_display: 'swap' }}
+  {{ settings.typography_headings | font_modify: 'weight', 'bold' | font_face: font_display: 'swap' }}
+  {{ settings.typography_headings | font_modify: 'style', 'italic' | font_face: font_display: 'swap' }}
+  {{ settings.typography_headings | font_modify: 'weight', 'bold' | font_modify: 'style', 'italic' | font_face: font_display: 'swap' }}
+
+  {%- if font_medium -%}
+  	{{ font_medium | font_face: font_display: 'swap' }}
+  	{%- assign font_weight_bolder = font_medium.weight -%}
+  {%- elsif font_semibold -%}
+  	{{ font_semibold | font_face: font_display: 'swap' }}
+  	{%- assign font_weight_bolder = font_semibold.weight -%}
+  {%- endif -%}
+
+  {%- liquid
+  	if settings.typography_body.system?
+  		assign font_weight_bolder = '500'
+  	endif
+
+  	assign font_weight_headings = settings.typography_headings.weight
+  	if settings.typography_headings.system?
+  		assign font_weight_headings = '500'
+  	endif
+  -%}
+
+  :root {
+  	--page-width: 146rem;
+  	--spacing-base-1: 2rem;
+
+  	--grid-desktop-horizontal-spacing: 20px;
+  	--grid-desktop-vertical-spacing: 20px;
+  	--grid-mobile-horizontal-spacing: 15px;
+  	--grid-mobile-vertical-spacing: 15px;
+
+  	--border-radius-base: {{ settings.border_style }};
+  	--buttons-radius: {{ buttons_border_radius }}px;
+  	--inputs-radius: 4px;
+  	--inputs-border-width: 1px;
+  	--inputs-border-opacity: .2;
+
+  	--color-base-white: #fff;
+  	--color-product-review-star: #ffc700;
+  	--color-base-text: {{ settings.colors_text.red }}, {{ settings.colors_text.green }}, {{ settings.colors_text.blue }};
+  	--color-base-text-alt: {{ settings.colors_text_alt.red }}, {{ settings.colors_text_alt.green }}, {{ settings.colors_text_alt.blue }};
+  	--color-base-border: {{ settings.colors_lines.red }}, {{ settings.colors_lines.green }}, {{ settings.colors_lines.blue }};
+  	--color-base-background-1: {{ settings.colors_background_1.red }}, {{ settings.colors_background_1.green }}, {{ settings.colors_background_1.blue }};
+  	--color-base-background-2: {{ settings.colors_background_2.red }}, {{ settings.colors_background_2.green }}, {{ settings.colors_background_2.blue }};
+  	--color-base-accent-1: {{ settings.colors_accent_1.red }}, {{ settings.colors_accent_1.green }}, {{ settings.colors_accent_1.blue }};
+  	--color-base-accent-1-text: {{ settings.colors_accent_1_text.red }}, {{ settings.colors_accent_1_text.green }}, {{ settings.colors_accent_1_text.blue }};
+  	--color-base-accent-2: {{ settings.colors_accent_2.red }}, {{ settings.colors_accent_2.green }}, {{ settings.colors_accent_2.blue }};
+  	--color-base-accent-2-text: {{ settings.colors_accent_2_text.red }}, {{ settings.colors_accent_2_text.green }}, {{ settings.colors_accent_2_text.blue }};
+  	--color-base-accent-3: {{ settings.colors_accent_3.red }}, {{ settings.colors_accent_3.green }}, {{ settings.colors_accent_3.blue }};
+  	--color-base-accent-3-text: {{ settings.colors_accent_3_text.red }}, {{ settings.colors_accent_3_text.green }}, {{ settings.colors_accent_3_text.blue }};
+
+  	{% if settings.colors_primary_button_background.red != blank %}
+  	--color-buttons-primary-background: {{ settings.colors_primary_button_background.red }}, {{ settings.colors_primary_button_background.green }}, {{ settings.colors_primary_button_background.blue }};
+  	{% endif %}
+  	{% if settings.colors_primary_button_text.red != blank %}
+  	--color-buttons-primary-text: {{ settings.colors_primary_button_text.red }}, {{ settings.colors_primary_button_text.green }}, {{ settings.colors_primary_button_text.blue }};
+  	{% endif %}
+  	{% if settings.colors_secondary_button_background.red != blank %}
+  	--color-buttons-secondary-background: {{ settings.colors_secondary_button_background.red }}, {{ settings.colors_secondary_button_background.green }}, {{ settings.colors_secondary_button_background.blue }};
+  	{% endif %}
+  	{% if settings.colors_secondary_button_text.red != blank %}
+  	--color-buttons-secondary-text: {{ settings.colors_secondary_button_text.red }}, {{ settings.colors_secondary_button_text.green }}, {{ settings.colors_secondary_button_text.blue }};
+  	{% endif %}
+
+  	--color-sale: rgba({{ settings.color_badge_sale.red }}, {{ settings.color_badge_sale.green }}, {{ settings.color_badge_sale.blue }}, {{ settings.color_badge_sale.alpha }});
+  	--color-sale-background: {{ settings.color_badge_sale | color_lighten: 35 }};
+  	--color-error: rgba({{ settings.color_badge_outofstock.red }}, {{ settings.color_badge_outofstock.green }}, {{ settings.color_badge_outofstock.blue }}, {{ settings.color_badge_outofstock.alpha }});
+  	--color-error-background: {{ settings.color_badge_outofstock | color_lighten: 56 }};
+  	--color-success: rgba({{ settings.color_badge_instock.red }}, {{ settings.color_badge_instock.green }}, {{ settings.color_badge_instock.blue }}, {{ settings.color_badge_instock.alpha }});
+  	--color-success-background: {{ settings.color_badge_instock | color_lighten: 58 }};
+  	--color-warning: rgba({{ settings.color_badge_limitedstock.red }}, {{ settings.color_badge_limitedstock.green }}, {{ settings.color_badge_limitedstock.blue }}, {{ settings.color_badge_limitedstock.alpha }});
+  	--color-warning-background: {{ settings.color_badge_limitedstock | color_lighten: 46 }};
+  	--color-preorder: rgba({{ settings.color_badge_preorder.red }}, {{ settings.color_badge_preorder.green }}, {{ settings.color_badge_preorder.blue }}, {{ settings.color_badge_preorder.alpha }});
+  	--color-preorder-background: {{ settings.color_badge_preorder | color_lighten: 37 }};
+  	--color-backorder: rgba({{ settings.color_badge_backorder.red }}, {{ settings.color_badge_backorder.green }}, {{ settings.color_badge_backorder.blue }}, {{ settings.color_badge_backorder.alpha }});
+  	--color-backorder-background: {{ settings.color_badge_backorder | color_lighten: 58 }};
+  	--color-price: {{ settings.price_color.red }}, {{ settings.price_color.green }}, {{ settings.price_color.blue }}, {{ settings.price_color.alpha }};
+  	--color-price-discounted: {{ settings.price_discounted_color.red }}, {{ settings.price_discounted_color.green }}, {{ settings.price_discounted_color.blue }}, {{ settings.price_color.alpha }};
+
+  	--font-body-family: {{ settings.typography_body.family }}, {{ settings.typography_body.fallback_families }};
+  	--font-body-style: {{ settings.typography_body.style }};
+  	--font-body-weight: {{ settings.typography_body.weight }};
+  	--font-bolder-weight: {{ font_weight_bolder }};
+
+  	--font-heading-family: {{ settings.typography_headings.family }}, {{ settings.typography_headings.fallback_families }};
+  	--font-heading-style: {{ settings.typography_headings.style }};
+  	--font-heading-weight: {{ font_weight_headings }};
+
+  	--font-body-scale: {{ settings.typography_body_size | divided_by: 100.0 }};
+  	--font-heading-scale: {{ settings.typography_headings_size | divided_by: 100.0 }};
+  	--font-heading-spacing: {{ headings_spacing }}em;
+  	--font-heading-transform: {{ headings_transform }};
+  	--font-product-price-scale: {{ settings.product_font_scale | divided_by: 100.0 }};
+  	--font-product-price-grid-scale: {{ settings.product_grid_font_scale | divided_by: 100.0 }};
+
+  	--font-buttons-family: {{ buttons_font_family }};
+  	--font-buttons-transform: {{ buttons_transform }};
+
+  	--font-badges-transform: {{ badges_transform }};
+  }
+
+  :root,
+  .color-background-1 {
+  	--color-foreground: var(--color-base-text);
+  	--color-foreground-alt: var(--color-base-text-alt);
+  	--color-background: var(--color-base-background-1);
+  	--color-border: rgb(var(--color-base-border));
+  	--color-box-shadow: rgba(var(--color-base-border), 0.2);
+  	--color-accent-1: var(--color-base-accent-1);
+  	--color-accent-2: var(--color-base-accent-2);
+  	--color-button: var(--color-buttons-primary-background, var(--color-base-accent-1));
+  	--color-button-text: var(--color-buttons-primary-text, var(--color-base-accent-1-text));
+  }
+
+  .color-background-2 {
+  	--color-foreground: var(--color-base-text);
+  	--color-foreground-alt: var(--color-base-text-alt);
+  	--color-background: var(--color-base-background-2);
+  	--color-border: rgb(var(--color-base-border));
+  	--color-box-shadow: rgba(var(--color-base-border), 0.2);
+  	--color-accent-1: var(--color-base-accent-1);
+  	--color-accent-2: var(--color-base-accent-2);
+  	--color-button: var(--color-base-accent-1);
+  	--color-button-text: var(--color-base-accent-1-text);
+  }
+
+  .color-accent-1 {
+  	--color-foreground: var(--color-base-accent-1-text);
+  	--color-foreground-alt: var(--color-base-accent-1-text);
+  	--color-background: var(--color-base-accent-1);
+  	--color-border: rgba(var(--color-base-accent-3-text), 0.2);
+  	--color-box-shadow: rgba(var(--color-base-border), 0.05);
+  	--color-accent-1: var(--color-base-accent-1-text);
+  	--color-accent-2: var(--color-base-accent-2);
+  	--color-button: var(--color-base-accent-2);
+  	--color-button-text: var(--color-base-accent-2-text);
+  }
+
+  .color-accent-2 {
+  	--color-foreground: var(--color-base-accent-2-text);
+  	--color-foreground-alt: var(--color-base-accent-2-text);
+  	--color-background: var(--color-base-accent-2);
+  	--color-border: rgba(var(--color-base-accent-2-text), 0.25);
+  	--color-box-shadow: rgba(var(--color-base-border), 0.05);
+  	--color-accent-1: var(--color-base-accent-1-text);
+  	--color-accent-2: var(--color-base-accent-1);
+  	--color-button: var(--color-base-accent-1);
+  	--color-button-text: var(--color-base-accent-1-text);
+  }
+
+  .color-accent-3 {
+  	--color-foreground: var(--color-base-accent-3-text);
+  	--color-foreground-alt: var(--color-base-accent-3-text);
+  	--color-background: var(--color-base-accent-3);
+  	--color-border: rgba(var(--color-base-accent-3-text), 0.1);
+  	--color-box-shadow: rgba(var(--color-base-border), 0.05);
+  	--color-accent-1: var(--color-base-accent-1-text);
+  	--color-accent-2: var(--color-base-accent-2);
+  	--color-button: var(--color-base-accent-1);
+  	--color-button-text: var(--color-base-accent-1-text);
+  }
+
+  body,
+  .color-background-1,
+  .color-background-2,
+  .color-accent-1,
+  .color-accent-2,
+  .color-accent-3 {
+  	color: rgb(var(--color-foreground));
+  	background-color: rgb(var(--color-background));
+  }
+{% endstyle %}
