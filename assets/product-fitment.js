@@ -73,9 +73,9 @@
           // Build the HTML list from the provided (potentially filtered) array
           const listHtml = fitmentsToDisplay.map(fitment => `
             <li class="product-fitment__list-item">
-              <span class="product-fitment__make">${escapeHtml(fitment.fitmentMake || 'N/A')}</span>
-              <span class="product-fitment__model">${escapeHtml(fitment.fitmentModel || 'N/A')}</span>
-              <span class="product-fitment__years">(${escapeHtml(fitment.fitmentYears || 'N/A')})</span>
+              <span class="product-fitment__make">${fitment.fitmentMake}</span>
+              <span class="product-fitment__model">${fitment.fitmentModel}</span>
+              <span class="product-fitment__years">(${fitment.fitmentYears})</span>
             </li>
           `).join('');
 
@@ -87,14 +87,25 @@
         // Helper to escape HTML characters
         const escapeHtml = (unsafe) => {
             if (!unsafe) return '';
-            return unsafe
-                 .toString()
+            // Ensure unsafe is a string before calling replace
+            return String(unsafe)
                  .replace(/&/g, "&amp;")
                  .replace(/</g, "&lt;")
                  .replace(/>/g, "&gt;")
                  .replace(/"/g, "&quot;")
                  .replace(/'/g, "&#039;");
          };
+
+        // --- Debounce Utility ---
+        const debounce = (func, delay) => {
+            let timeoutId;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    func.apply(this, args);
+                }, delay);
+            };
+        };
 
         // --- Filter Logic ---
         const handleFilter = (event) => {
@@ -103,11 +114,8 @@
             if (!allFitments) return; // Safety check
 
             const filteredFitments = allFitments.filter(fitment => {
-                const make = (fitment.fitmentMake || '').toLocaleLowerCase();
-                const model = (fitment.fitmentModel || '').toLocaleLowerCase();
-                const years = (fitment.fitmentYears || '').toLocaleLowerCase();
-                // Check if search term is included in make, model, or years
-                return make.includes(searchTerm) || model.includes(searchTerm) || years.includes(searchTerm);
+                // Use the pre-processed searchableString for efficient, case-insensitive search
+                return fitment.searchableString.includes(searchTerm);
             });
 
             displayResults(filteredFitments); // Re-render the list with filtered results
@@ -115,7 +123,7 @@
 
         // Add event listener to filter input if it exists
         if (filterInput) {
-            filterInput.addEventListener('input', handleFilter);
+            filterInput.addEventListener('input', debounce(handleFilter, 300));
         }
 
         // --- Make the API Call ---
@@ -153,6 +161,24 @@
                 return 0;
               });
               // --- End Sorting ---
+
+              // --- Escape HTML content once after fetching and sorting ---
+              allFitments = allFitments.map(fitment => ({
+                ...fitment,
+                fitmentMake: escapeHtml(fitment.fitmentMake || 'N/A'),
+                fitmentModel: escapeHtml(fitment.fitmentModel || 'N/A'),
+                fitmentYears: escapeHtml(fitment.fitmentYears || 'N/A')
+              }));
+              // --- End Escaping ---
+
+              // --- Pre-process for optimized filtering ---
+              allFitments = allFitments.map(fitment => ({
+                ...fitment,
+                // Concatenate and lowercase relevant fields for efficient searching.
+                // These fields are already escaped and defaulted to 'N/A' if originally empty.
+                searchableString: (fitment.fitmentMake + " " + fitment.fitmentModel + " " + fitment.fitmentYears).toLocaleLowerCase()
+              }));
+              // --- End Pre-processing ---
 
               displayResults(allFitments); // Display initial, sorted list
               if (filterInput && allFitments.length > 0) {
