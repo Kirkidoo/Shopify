@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return item.value;
         } catch (e) {
-            console.error(`Error reading from cache key ${cacheKey}:`, e);
+            console.error(`Error reading from sessionStorage key ${cacheKey}:`, e);
             try { sessionStorage.removeItem(cacheKey); } catch (removeError) {}
             return null;
         }
@@ -108,7 +108,36 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             sessionStorage.setItem(cacheKey, JSON.stringify(item));
         } catch (e) {
-            console.error(`Error setting cache key ${cacheKey}:`, e);
+            console.error(`Error setting sessionStorage key ${cacheKey}:`, e);
+        }
+    };
+
+    const getLocalStorageCache = (key, currentSectionId) => {
+        const cacheKey = `${CACHE_PREFIX}${currentSectionId}_${key}`;
+        try {
+            const itemStr = localStorage.getItem(cacheKey);
+            if (!itemStr) return null;
+            const item = JSON.parse(itemStr);
+            if (new Date().getTime() > item.expiry) {
+                localStorage.removeItem(cacheKey);
+                console.log(`localStorage cache expired for key: ${cacheKey}`);
+                return null;
+            }
+            return item.value;
+        } catch (e) {
+            console.error(`Error reading from localStorage key ${cacheKey}:`, e);
+            try { localStorage.removeItem(cacheKey); } catch (removeError) {}
+            return null;
+        }
+    };
+
+    const setLocalStorageCache = (key, value, currentSectionId) => {
+        const cacheKey = `${CACHE_PREFIX}${currentSectionId}_${key}`;
+        const item = { value: value, expiry: new Date().getTime() + CACHE_EXPIRY_MS };
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify(item));
+        } catch (e) {
+            console.error(`Error setting localStorage key ${cacheKey}:`, e);
         }
     };
 
@@ -280,7 +309,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const resetAllSelectorsAndResults = () => {
       console.log(`Resetting all selectors for section ${sectionId}`);
-      clearCache();
+      clearCache(); // Clears section-specific sessionStorage
+
+      // Explicitly clear the 'types' data from localStorage for this section
+      try {
+          const typesCacheKey = `${CACHE_PREFIX}${sectionId}_types`;
+          localStorage.removeItem(typesCacheKey);
+          console.log(`Cleared types from localStorage for section ${sectionId}`);
+      } catch (e) {
+          console.warn(`Could not clear types from localStorage for section ${sectionId}:`, e);
+      }
+
       try {
           localStorage.removeItem(LAST_SELECTED_VEHICLE_STORAGE_KEY);
           console.log(`Cleared last selected vehicle from localStorage.`);
@@ -288,7 +327,9 @@ document.addEventListener('DOMContentLoaded', () => {
           console.warn(`Could not clear last selected vehicle from localStorage:`, e);
       }
 
-      const originalTypeOptions = getCache('types') || [];
+      // Attempt to load types from localStorage first for repopulation after reset,
+      // otherwise, it will be fetched in initialize()
+      const originalTypeOptions = getLocalStorageCache('types', sectionId) || [];
 
       resetSelect(elements.typeSelect, PLACEHOLDERS.TYPE, originalTypeOptions.length === 0);
       if (originalTypeOptions.length > 0) {
@@ -402,42 +443,144 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /**
-     * Fetches Shopify product/variant data by SKU.
-     * PERFORMANCE NOTE: This makes two requests per SKU. If the Shopify API supports
-     * batch fetching products by multiple SKUs or handles, that would be more performant.
-     * Consider investigating Shopify's GraphQL API for batch operations if performance becomes an issue.
+     * Fetches Shopify product and variant data for a list of SKUs using a single GraphQL query.
      */
-    const fetchShopifyProductBySkuMultiStep = async (sku) => {
-        if (!sku) return null;
-        const normalizedSku = String(sku).trim().toLowerCase();
-        if (!normalizedSku) return null;
-        let productHandle = null;
-        try {
-            const encodedSkuQuery = encodeURIComponent(`variants.sku:"${normalizedSku}"`);
-            // Fetching minimal data: only handle
-            const suggestUrl = `/search/suggest.json?q=${encodedSkuQuery}&resources[type]=product&resources[limit]=1&resources[options][unavailable_products]=show&resources[fields]=handle`;
-            const suggestResponse = await fetch(suggestUrl);
-            if (suggestResponse.ok) {
-                const suggestions = await suggestResponse.json();
-                const products = suggestions?.resources?.results?.products;
-                if (products && products.length > 0) productHandle = products[0].handle;
-            }
-        } catch (error) { console.error(`Shopify suggest fetch error for SKU ${normalizedSku}:`, error); }
-
-        if (productHandle) {
-            try {
-                const productJsonUrl = `/products/${productHandle}.js`;
-                const productResponse = await fetch(productJsonUrl);
-                if (productResponse.ok) {
-                    const fullProductData = await productResponse.json();
-                    if (fullProductData && Array.isArray(fullProductData.variants)) {
-                        const matchingVariant = fullProductData.variants.find(v => v.sku && String(v.sku).trim().toLowerCase() === normalizedSku);
-                        if (matchingVariant) return { product: fullProductData, variant: matchingVariant };
-                    }
-                }
-            } catch (error) { console.error(`Shopify product JSON fetch error for handle ${productHandle}:`, error); }
+    const fetchShopifyProductsGraphQL = async (skus) => {
+        if (!Array.isArray(skus) || skus.length === 0) {
+            return new Map();
         }
-        return null;
+
+        const storefrontAccessToken = window.Shopify?.storefrontAccessToken;
+        if (!storefrontAccessToken) {
+            console.error('Shopify Storefront Access Token not found. Cannot fetch products.');
+            // Return a map where each SKU maps to an error or null
+            const errorResult = new Map();
+            skus.forEach(sku => errorResult.set(sku, { error: 'Storefront Access Token not found.' }));
+            return errorResult;
+        }
+
+        const uniqueSkus = [...new Set(skus.map(sku => String(sku).trim()).filter(sku => sku))];
+        if (uniqueSkus.length === 0) {
+            return new Map();
+        }
+
+        const query = `
+            query GetProductsBySkus($query_string: String!, $numProducts: Int!) {
+              products(first: $numProducts, query: $query_string) {
+                edges {
+                  node {
+                    handle
+                    title
+                    featuredImage {
+                      url
+                      altText
+                    }
+                    variants(first: 250) {
+                      edges {
+                        node {
+                          id
+                          title
+                          sku
+                          availableForSale
+                          price {
+                            amount
+                            currencyCode
+                          }
+                          image {
+                            url
+                            altText
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        `;
+
+        const queryString = uniqueSkus.map(sku => `sku:${sku}`).join(" OR ");
+        const variables = {
+            query_string: queryString,
+            numProducts: uniqueSkus.length
+        };
+
+        try {
+            const response = await fetch('/api/graphql.json', { // Using a relative path for the endpoint
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Shopify-Storefront-Access-Token': storefrontAccessToken,
+                },
+                body: JSON.stringify({ query, variables }),
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                console.error(`GraphQL request failed: ${response.status} ${response.statusText}`, errorBody);
+                throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+            }
+
+            const jsonResponse = await response.json();
+            if (jsonResponse.errors) {
+                console.error('GraphQL API errors:', jsonResponse.errors);
+                throw new Error('GraphQL API returned errors.');
+            }
+
+            const productsData = jsonResponse.data?.products?.edges || [];
+            const results = new Map();
+
+            // Initialize results map with null for all requested SKUs to track which ones are found
+            uniqueSkus.forEach(sku => results.set(sku, null));
+
+            productsData.forEach(edge => {
+                const productNode = edge.node;
+                if (productNode && productNode.variants && productNode.variants.edges) {
+                    productNode.variants.edges.forEach(variantEdge => {
+                        const variantNode = variantEdge.node;
+                        const currentSku = String(variantNode.sku).trim();
+
+                        // If this SKU was requested, map it
+                        if (results.has(currentSku)) {
+                            // Adapt Shopify GraphQL structure to the structure expected by createProductCard
+                            // The original `fetchShopifyProductBySkuMultiStep` returned { product, variant }
+                            // where `product` was the full product.js and `variant` was a specific variant object.
+                            // We need to ensure `createProductCard` can handle this new structure.
+                            // It expects `product.title`, `product.handle`, `product.featured_image`
+                            // and `variant.id`, `variant.title`, `variant.sku`, `variant.available`, `variant.price`, `variant.featured_image`
+
+                            const adaptedProduct = {
+                                handle: productNode.handle,
+                                title: productNode.title,
+                                featured_image: productNode.featuredImage?.url, // Note: this was product.featured_image (string)
+                                // The original product object from .js had more fields, but createProductCard primarily uses these.
+                            };
+                            const adaptedVariant = {
+                                id: variantNode.id.split('/').pop(), // Get the numeric ID from gid://Shopify/ProductVariant/VARIANT_ID
+                                title: variantNode.title,
+                                sku: variantNode.sku,
+                                available: variantNode.availableForSale,
+                                price: parseFloat(variantNode.price.amount) * 100, // Assuming price is in cents as original
+                                featured_image: variantNode.image ? { src: variantNode.image.url, alt: variantNode.image.altText } : (productNode.featuredImage ? {src: productNode.featuredImage.url, alt: productNode.featuredImage.altText} : null),
+                                // Ensure `currencyCode` is available if needed, though createProductCard doesn't use it.
+                            };
+
+                            // If multiple SKUs map to the same product, this will overwrite.
+                            // However, the query is specific, so each variant.sku should be unique in the response matching a unique input SKU.
+                            results.set(currentSku, { product: adaptedProduct, variant: adaptedVariant });
+                        }
+                    });
+                }
+            });
+            return results;
+
+        } catch (error) {
+            console.error('Error fetching or processing Shopify products via GraphQL:', error);
+            // In case of a total fetch failure, return a map with errors for all SKUs
+            const errorResult = new Map();
+            uniqueSkus.forEach(sku => errorResult.set(sku, { error: error.message || 'Failed to fetch product data.' }));
+            return errorResult;
+        }
     };
 
     /** Creates an HTML product card element. Adds 'card-fade-in' class for animation. */
@@ -524,7 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     const displayResults = async (fitmentProducts) => {
         if (!elements.resultsContainer) return;
-        elements.resultsContainer.innerHTML = ''; // Clear previous results or "select vehicle" message
+        elements.resultsContainer.innerHTML = ''; // Clear previous results
 
         if (!Array.isArray(fitmentProducts) || fitmentProducts.length === 0) {
             elements.resultsContainer.innerHTML = '<p>No matching part numbers found for the selected vehicle.</p>';
@@ -540,58 +683,115 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         elements.resultsContainer.appendChild(productGrid);
 
-        const shopifyDataPromises = fitmentProducts.map(gammaProduct => {
-            const sku = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : undefined;
-            const description = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_DESC] : undefined;
-            if (!sku) return Promise.reject({ reason: new Error('Missing SKU from API response'), sku: 'MISSING', description });
-            return fetchShopifyProductBySkuMultiStep(sku)
-                .then(shopifyResult => ({ sku, description, shopifyResult }))
-                .catch(error => { throw { reason: error, sku, description }; });
-        });
+        const allSkus = fitmentProducts.map(gammaProduct => gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : null).filter(sku => sku);
 
-        const shopifyResultsSettled = await Promise.allSettled(shopifyDataPromises);
+        if (allSkus.length === 0) {
+            productGrid.innerHTML = ''; // Clear skeletons
+            elements.resultsContainer.innerHTML = '<p>No valid SKUs found in the product list to search.</p>';
+            return;
+        }
+
+        // Fetch all Shopify product data in one go
+        const shopifyProductsMap = await fetchShopifyProductsGraphQL(allSkus);
 
         // Clear skeletons before adding actual cards
         productGrid.innerHTML = '';
         let foundCount = 0, unmatchedCount = 0;
-
-        // Using a DocumentFragment for potentially better performance with many cards
         const fragment = document.createDocumentFragment();
 
-        shopifyResultsSettled.forEach(result => {
-            if (result.status === 'fulfilled') {
-                const { sku, description, shopifyResult } = result.value;
-                if (shopifyResult?.product && shopifyResult?.variant) {
-                    const productCardElement = createProductCard(shopifyResult.product, shopifyResult.variant);
-                    if (productCardElement) {
-                        foundCount++;
-                        fragment.appendChild(productCardElement);
-                    }
-                } else {
+        fitmentProducts.forEach(gammaProduct => {
+            const sku = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : undefined;
+            const description = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_DESC] : undefined;
+
+            if (!sku) {
+                console.warn('Gamma product entry missing SKU, skipping:', gammaProduct);
+                // Potentially create an "error" card for this case if desired
+                // fragment.appendChild(createUnmatchedSkuCard('MISSING_SKU', description || 'Product data incomplete'));
+                // unmatchedCount++;
+                return;
+            }
+
+            const shopifyResult = shopifyProductsMap.get(String(sku).trim());
+
+            if (shopifyResult && shopifyResult.product && shopifyResult.variant) {
+                const productCardElement = createProductCard(shopifyResult.product, shopifyResult.variant);
+                if (productCardElement) {
+                    foundCount++;
+                    fragment.appendChild(productCardElement);
+                } else { // Should not happen if shopifyResult.product and .variant are valid
                     unmatchedCount++;
                     fragment.appendChild(createUnmatchedSkuCard(sku, description));
                 }
             } else {
                 unmatchedCount++;
-                const { sku = 'unknown', description = 'unknown', reason = 'Unknown error processing SKU' } = result.reason || {};
-                console.error(`Promise rejected for SKU '${sku}'. Reason:`, reason);
+                if (shopifyResult && shopifyResult.error) {
+                     console.error(`Error fetching Shopify data for SKU ${sku}: ${shopifyResult.error}`);
+                     if (shopifyResult.error === 'Storefront Access Token not found.' && elements.errorMessageContainer) {
+                        // Check if the specific error message isn't already displayed to avoid duplicates.
+                        const errorContainer = document.querySelector(`#fitment-error-message-${sectionId}`);
+                        if (errorContainer && !errorContainer.textContent.includes('Shopify Storefront Access Token is missing')) {
+                            displayError('Critical: Shopify Storefront Access Token is missing. Product information cannot be displayed. Please check theme settings.', sectionId);
+                        }
+                     }
+                }
                 fragment.appendChild(createUnmatchedSkuCard(sku, description));
             }
         });
 
         productGrid.appendChild(fragment); // Append all cards at once
 
-        if (foundCount === 0 && unmatchedCount === 0) { // Should not happen if fitmentProducts was not empty
-             elements.resultsContainer.innerHTML = '<p>No products could be processed or displayed.</p>';
-        } else if (foundCount === 0 && unmatchedCount > 0) {
-            // Optionally, add a summary message if only unmatched SKUs were found
+        // Do not overwrite the critical token error if it was just displayed.
+        const errorContainer = document.querySelector(`#fitment-error-message-${sectionId}`);
+        const isTokenErrorDisplayed = errorContainer && errorContainer.textContent.includes('Shopify Storefront Access Token is missing');
+
+        if (!isTokenErrorDisplayed) {
+            if (foundCount === 0 && unmatchedCount === 0 && fitmentProducts.length > 0) {
+                 elements.resultsContainer.innerHTML = '<p>No products could be processed or displayed.</p>';
+            } else if (foundCount === 0 && unmatchedCount > 0) {
+                const summaryMessage = document.createElement('p');
+                summaryMessage.textContent = `Found ${unmatchedCount} part number(s) that are not currently available in this store or could not be retrieved.`;
+                summaryMessage.style.textAlign = 'center';
+                summaryMessage.style.marginBottom = 'var(--fitment-spacing-sm)';
+                elements.resultsContainer.insertBefore(summaryMessage, productGrid);
+            }
+        } else if (productGrid.children.length === 0 && foundCount === 0 && unmatchedCount > 0) {
+            // If token error IS displayed, and no product cards were added (only unmatched),
+            // ensure the grid itself is cleared or hidden to prevent empty space or only unmatched cards showing confusingly.
+            // The error message itself is the primary feedback in this case.
+            productGrid.innerHTML = ''; // Clear any unmatched cards if the token error is the main issue.
+            // Optionally, add a small note that no products could be checked.
+            const note = document.createElement('p');
+            note.textContent = "Product details could not be checked due to the missing token.";
+            note.style.textAlign = 'center';
+            elements.resultsContainer.appendChild(note);
+
+        } else if (isTokenErrorDisplayed && foundCount === 0 && unmatchedCount > 0) {
+             // If token error is displayed, and we only have unmatched cards, we might want to suppress the generic "Found X part numbers not available"
+             // because the primary error is the token.
+             // We can clear the productGrid if it only contains unmatched cards.
+             let onlyUnmatched = true;
+             for(const child of productGrid.childNodes) {
+                 if (!child.classList || !child.classList.contains('fitment-product-not-found')) {
+                     onlyUnmatched = false;
+                     break;
+                 }
+             }
+             if(onlyUnmatched) {
+                 productGrid.innerHTML = '';
+                 const summaryMessage = document.createElement('p');
+                 summaryMessage.textContent = `Additionally, ${unmatchedCount} other part(s) were processed but could not be matched or found in the store.`;
+                 summaryMessage.style.textAlign = 'center';
+                 summaryMessage.style.marginTop = '10px'; // Add some space from the main error
+                 elements.resultsContainer.appendChild(summaryMessage);
+             }
+        } else if (foundCount === 0 && unmatchedCount > 0) { // This condition might be redundant due to above, but kept for safety.
             const summaryMessage = document.createElement('p');
-            summaryMessage.textContent = `Found ${unmatchedCount} part number(s) that are not currently available in this store.`;
+            summaryMessage.textContent = `Found ${unmatchedCount} part number(s) that are not currently available in this store or could not be retrieved.`;
             summaryMessage.style.textAlign = 'center';
             summaryMessage.style.marginBottom = 'var(--fitment-spacing-sm)';
             elements.resultsContainer.insertBefore(summaryMessage, productGrid);
         }
-         // If productGrid is already appended and populated, no need to clear resultsContainer again
+        // If productGrid is already appended and populated, no need to clear resultsContainer again
     };
 
     // --- Event Listeners ---
@@ -859,29 +1059,46 @@ document.addEventListener('DOMContentLoaded', () => {
         resetSelect(elements.modelSelect, PLACEHOLDERS.MODEL, true);
         if(elements.findPartsButton) elements.findPartsButton.disabled = true;
 
-        const cacheKey = 'types';
-        const cachedData = getCache(cacheKey);
-        try {
-            let apiResponse = cachedData ? { [API_RESPONSE_KEYS.TYPES]: cachedData } : null;
-            if (!apiResponse) {
+        const cacheKey = 'types'; // Key for types data
+        let typesData = getLocalStorageCache(cacheKey, sectionId);
+        let apiResponse;
+
+        if (typesData) {
+            apiResponse = { [API_RESPONSE_KEYS.TYPES]: typesData };
+            console.log(`Loaded types from localStorage for section ${sectionId}`);
+        } else {
+            console.log(`Types not found in localStorage for section ${sectionId}, fetching from API.`);
+            try {
                 if (!apiEndpoints.types) throw new Error("Types API endpoint URL is missing in configuration.");
-                apiResponse = await fetchAPI(apiEndpoints.types);
-                const typesToCache = apiResponse?.[API_RESPONSE_KEYS.TYPES] || apiResponse || [];
-                setCache(cacheKey, Array.isArray(typesToCache) ? typesToCache : []);
+                const fetchedApiResponse = await fetchAPI(apiEndpoints.types);
+                typesData = fetchedApiResponse?.[API_RESPONSE_KEYS.TYPES] || fetchedApiResponse || [];
+                if (!Array.isArray(typesData)) throw new Error('Invalid types data format received from API after fetch.');
+                setLocalStorageCache(cacheKey, typesData, sectionId);
+                apiResponse = { [API_RESPONSE_KEYS.TYPES]: typesData };
+            } catch (error) {
+                console.error(`initialize: Error caught during type fetching for section ${sectionId}:`, error);
+                displayError(`Initialization failed: Could not load vehicle types. ${error.message}`, sectionId);
+                disableAllSelectors();
+                toggleLoading(elements.typeLoading, false);
+                return; // Stop initialization if types can't be loaded
             }
-            const data = apiResponse?.[API_RESPONSE_KEYS.TYPES] || apiResponse || [];
-            if (!Array.isArray(data)) throw new Error('Invalid types data format received from API.');
+        }
+
+        const data = apiResponse?.[API_RESPONSE_KEYS.TYPES] || []; // Ensure data is an array
+        if (!Array.isArray(data)) { // Should be caught by earlier checks, but as a safeguard
+             console.error(`initialize: Types data is not an array for section ${sectionId}. Data:`, data);
+             displayError(`Initialization failed: Invalid types data structure.`, sectionId);
+             disableAllSelectors();
+             toggleLoading(elements.typeLoading, false);
+             return;
+        }
             const sortedTypes = data.sort((a, b) => a.localeCompare(b));
             populateSelect(elements.typeSelect, sortedTypes);
             if (sortedTypes.length === 0) {
                 displayError("No vehicle types are currently available. Please check back later.", sectionId);
                 disableAllSelectors();
             }
-        } catch (error) {
-            console.error(`initialize: Error caught during type fetching for section ${sectionId}:`, error);
-            displayError(`Initialization failed: Could not load vehicle types. ${error.message}`, sectionId);
-            disableAllSelectors();
-        } finally {
+        } finally { // Error handling for API fetch is now inside the 'else' block
             toggleLoading(elements.typeLoading, false);
         }
     };
