@@ -19,6 +19,9 @@
         // Find elements within this specific section
         const loadingElement = section.querySelector('.product-fitment__loading');
         const resultsContainer = section.querySelector('.product-fitment__results');
+        if (resultsContainer) {
+          resultsContainer.setAttribute('aria-live', 'polite'); // Add this line
+        }
         const errorMessageElement = section.querySelector('.product-fitment__error-message');
         const sectionWrapper = section.closest('.product-fitment-wrapper');
         const filterInput = section.querySelector(`#fitment-filter-${sectionId}`); // Get filter input
@@ -203,8 +206,34 @@
         };
 
         // --- Initialize ---
-        fetchFitmentData();
+        // Check for Intersection Observer support
+        if ('IntersectionObserver' in window) {
+          const observerOptions = {
+            root: null, // viewport
+            rootMargin: '50px', // Start loading when 50px away from viewport
+            threshold: 0.01 // As soon as a tiny part is visible
+          };
 
+          const observerCallback = (entries, observer) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                // Check if data hasn't been loaded yet for this section
+                if (!section.dataset.apiCalled) {
+                  section.dataset.apiCalled = 'true'; // Mark that API call is being made
+                  fetchFitmentData();
+                  observer.unobserve(section); // Stop observing once triggered
+                }
+              }
+            });
+          };
+
+          const observer = new IntersectionObserver(observerCallback, observerOptions);
+          observer.observe(section);
+        } else {
+          // Fallback for browsers that don't support Intersection Observer
+          console.log(`Product Fitment (${sectionId}): Intersection Observer not supported, loading data immediately.`);
+          fetchFitmentData();
+        }
       }); // End forEach section
     }); // End DOMContentLoaded
     

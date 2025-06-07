@@ -269,3 +269,10 @@
     clip: rect(1px, 1px, 1px, 1px);
     white-space: nowrap; /* Prevent line breaks */
 }
+
+/* Respect user's preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .product-fitment__loading::before {
+    animation: none; /* Disable the spin animation */
+  }
+}
