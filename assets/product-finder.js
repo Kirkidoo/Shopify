@@ -1,11 +1,5 @@
 console.log('product-finder.js executing...'); // Version indicator - Enhanced
 
-// --- Shopify Storefront API Configuration ---
-// These should be configured via Shopify Theme Customizer or section settings
-const SHOPIFY_STOREFRONT_API_URL_PLACEHOLDER = 'https://your-shop-name.myshopify.com/api/2024-01/graphql.json';
-const SHOPIFY_STOREFRONT_ACCESS_TOKEN_PLACEHOLDER = 'your-storefront-access-token';
-
-
 document.addEventListener('DOMContentLoaded', () => {
   console.log('DOMContentLoaded event fired.');
 
@@ -88,9 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Configuration & Element References ---
     const apiBaseUrl = section.dataset.apiBaseUrl;
     const apiToken = section.dataset.apiToken;
-    // Use dataset values if available, otherwise fall back to placeholders
-    const storefrontApiUrl = section.dataset.storefrontApiUrl || SHOPIFY_STOREFRONT_API_URL_PLACEHOLDER;
-    const storefrontAccessToken = section.dataset.storefrontAccessToken || SHOPIFY_STOREFRONT_ACCESS_TOKEN_PLACEHOLDER;
+    // const storefrontApiUrl = section.dataset.storefrontApiUrl || SHOPIFY_STOREFRONT_API_URL_PLACEHOLDER; // Removed
+    // const storefrontAccessToken = section.dataset.storefrontAccessToken || SHOPIFY_STOREFRONT_ACCESS_TOKEN_PLACEHOLDER; // Removed
     const isToggleEnabled = section.dataset.toggleEnabled === 'true';
 
     const apiEndpoints = {
@@ -496,116 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- API and Shopify Fetching Functions ---
 
-    const fetchShopifyProductsGraphQL = async (skus, storefrontApiUrl, storefrontAccessToken) => {
-      // Fetches product data from Shopify's Storefront GraphQL API based on an array of SKUs.
-      if (!skus || skus.length === 0) return [];
-      if (!storefrontApiUrl || !storefrontAccessToken || storefrontApiUrl === SHOPIFY_STOREFRONT_API_URL_PLACEHOLDER || storefrontAccessToken === SHOPIFY_STOREFRONT_ACCESS_TOKEN_PLACEHOLDER) {
-        console.error('Storefront API URL or Access Token is missing or using placeholder values.');
-        // This error is critical and not typically user-retryable in the same way as a network error.
-        const err = new Error('Shopify Storefront API URL or Access Token is not configured properly.');
-        err.isRetryable = false;
-        throw err;
-      }
-
-      const skuQuery = skus.map(s => `sku:${s.trim()}`).join(" OR ");
-      const query = `
-        query getProductsBySkus {
-          products(first: ${skus.length + 5}, query: "${skuQuery}") { # Fetch a bit more in case of non-exact matches initially
-            edges {
-              node {
-                handle
-                title
-                featuredImage {
-                  url
-                  altText
-                }
-                variants(first: 250) {
-                  edges {
-                    node {
-                      id # This is the full GID, e.g., "gid://shopify/ProductVariant/12345"
-                      sku
-                      title
-                      priceV2 {
-                        amount
-                        currencyCode
-                      }
-                      availableForSale
-                      image { # Variant specific image
-                        url
-                        altText
-                      }
-                      # featuredImage is already at product level, variant.image is the specific one
-                      # No need for featuredImage under variant.node unless it's a different resolver
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      try {
-        const response = await fetch(storefrontApiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Shopify-Storefront-Access-Token': storefrontAccessToken,
-          },
-          body: JSON.stringify({ query }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error('Shopify GraphQL API Error:', response.status, errorData);
-          const err = new Error(`Shopify API request failed: ${response.status}. ${errorData.substring(0, 200)}`);
-          // 5xx errors are generally retryable, 4xx less so (unless it's 429)
-          err.isRetryable = response.status >= 500 || response.status === 429;
-          throw err;
-        }
-
-        const jsonResponse = await response.json();
-        if (jsonResponse.errors) {
-          console.error('Shopify GraphQL Query Errors:', jsonResponse.errors);
-          const err = new Error(`GraphQL query errors: ${jsonResponse.errors.map(e => e.message).join(', ')}`);
-          err.isRetryable = false; // GraphQL query errors are usually not solved by a simple retry
-          throw err;
-        }
-
-        const productsData = jsonResponse.data?.products?.edges || [];
-        const mappedResults = [];
-
-        productsData.forEach(edge => {
-          const productNode = edge.node;
-          if (productNode && productNode.variants && productNode.variants.edges) {
-            productNode.variants.edges.forEach(variantEdge => {
-              const variantNode = variantEdge.node;
-              if (variantNode && variantNode.sku && skus.some(s => String(s).trim().toLowerCase() === String(variantNode.sku).trim().toLowerCase())) {
-                mappedResults.push({
-                  product: { // This structure matches what createProductCard expects for 'product'
-                    handle: productNode.handle,
-                    title: productNode.title,
-                    featured_image: productNode.featuredImage, // { url, altText }
-                  },
-                  variant: { // This structure matches what createProductCard expects for 'variant'
-                    id: variantNode.id, // Full GID
-                    sku: variantNode.sku,
-                    title: variantNode.title,
-                    price: parseFloat(variantNode.priceV2?.amount) * 100 || 0, // Price in cents
-                    available: variantNode.availableForSale,
-                    featured_image: variantNode.image || productNode.featuredImage, // Use variant image if available, else product's featured image
-                  }
-                });
-              }
-            });
-          }
-        });
-        return mappedResults;
-      } catch (error) {
-        console.error('Error fetching Shopify products via GraphQL:', error);
-        throw error;
-      }
-    };
+    // const fetchShopifyProductsGraphQL = ...; // Removed
 
     const fetchAPI = async (url, method = 'GET', body = null) => {
         // Generic API fetching function, used for the Gamma Powersports API.
@@ -895,89 +779,75 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         elements.resultsContainer.appendChild(productGrid);
 
-        const allSkus = [...new Set(fitmentProducts.map(p => p?.[API_RESPONSE_KEYS.PRODUCT_SKU]).filter(sku => sku))];
-
-        if (allSkus.length === 0) {
-            productGrid.innerHTML = ''; // Clear skeletons
-            elements.resultsContainer.innerHTML = '<p>No SKUs found in the provided fitment data to search for.</p>';
-            return;
-        }
-
-        try {
-            // Ensure storefrontApiUrl and storefrontAccessToken are valid before calling
-            if (!storefrontApiUrl || storefrontApiUrl === SHOPIFY_STOREFRONT_API_URL_PLACEHOLDER ||
-                !storefrontAccessToken || storefrontAccessToken === SHOPIFY_STOREFRONT_ACCESS_TOKEN_PLACEHOLDER) {
-                throw new Error("Shopify Storefront API credentials are not configured. Please set them in the theme customizer or section settings.");
+        // Revert to using fetchShopifyProductBySkuMultiStep for each product
+        const shopifyDataPromises = fitmentProducts.map(gammaProduct => {
+            const sku = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_SKU] : undefined;
+            const description = gammaProduct ? gammaProduct[API_RESPONSE_KEYS.PRODUCT_DESC] : undefined;
+            if (!sku) {
+                // Return a resolved promise with null shopifyResult for SKUs missing from API response
+                return Promise.resolve({ sku: 'MISSING_SKU', description, shopifyResult: null });
             }
+            return fetchShopifyProductBySkuMultiStep(sku)
+                .then(shopifyResult => ({ sku, description, shopifyResult })) // shopifyResult is {product, variant} or null
+                .catch(error => {
+                    // This catch is a fallback, as fetchShopifyProductBySkuMultiStep should handle its own errors and return null.
+                    // However, if it somehow throws an unhandled error, we catch it here.
+                    console.error(`Critical Error during fetchShopifyProductBySkuMultiStep for SKU ${sku}:`, error);
+                    return { sku, description, shopifyResult: null, error: true }; // Mark error for potential specific handling
+                });
+        });
 
-            const shopifyProductDataArray = await fetchShopifyProductsGraphQL(allSkus, storefrontApiUrl, storefrontAccessToken);
+        const shopifyResultsSettled = await Promise.allSettled(shopifyDataPromises);
 
-            const shopifyDataMap = new Map();
-            shopifyProductDataArray.forEach(item => {
-                if (item.variant && item.variant.sku) {
-                    // Normalize SKU from Shopify to lowercase for case-insensitive matching
-                    shopifyDataMap.set(String(item.variant.sku).trim().toLowerCase(), item);
-                }
-            });
+        productGrid.innerHTML = ''; // Clear skeletons before adding actual cards
+        let foundCount = 0;
+        let unmatchedCount = 0;
+        const fragment = document.createDocumentFragment();
 
-            productGrid.innerHTML = ''; // Clear skeletons
-            let foundCount = 0;
-            let unmatchedCount = 0;
-            const fragment = document.createDocumentFragment();
-
-            fitmentProducts.forEach(gammaProduct => {
-                const sku = gammaProduct?.[API_RESPONSE_KEYS.PRODUCT_SKU];
-                const description = gammaProduct?.[API_RESPONSE_KEYS.PRODUCT_DESC] || 'Unknown Description';
-
-                if (!sku) {
-                    console.warn('Gamma product entry missing SKU:', gammaProduct);
-                    // This case should ideally be handled by creating a specific card or logging.
-                    // For now, it's skipped if `allSkus` filter didn't catch it (e.g. if it was null/empty string).
-                    return;
-                }
-                // Normalize SKU from Gamma for matching
-                const normalizedGammaSku = String(sku).trim().toLowerCase();
-                const shopifyData = shopifyDataMap.get(normalizedGammaSku);
-
-                if (shopifyData?.product && shopifyData?.variant) {
-                    const productCardElement = createProductCard(shopifyData.product, shopifyData.variant);
+        shopifyResultsSettled.forEach(result => {
+            if (result.status === 'fulfilled') {
+                const { sku, description, shopifyResult, error } = result.value;
+                if (error) { // If marked with an error from the catch block above
+                    unmatchedCount++;
+                    fragment.appendChild(createUnmatchedSkuCard(sku, description));
+                    // Optionally, log that this specific item failed due to an unexpected error in fetch step
+                    console.warn(`SKU ${sku} processing failed due to an unexpected error in fetchShopifyProductBySkuMultiStep.`);
+                } else if (shopifyResult?.product && shopifyResult?.variant) {
+                    const productCardElement = createProductCard(shopifyResult.product, shopifyResult.variant);
                     if (productCardElement) {
                         foundCount++;
                         fragment.appendChild(productCardElement);
-                    } else {
-                        // This case implies createProductCard returned null, which is unlikely with valid data.
+                    } else { // Should not happen if shopifyResult is valid and createProductCard is robust
                         unmatchedCount++;
                         fragment.appendChild(createUnmatchedSkuCard(sku, description));
                     }
-                } else {
+                } else { // shopifyResult is null (handled error in fetchShopifyProductBySkuMultiStep or missing SKU)
                     unmatchedCount++;
                     fragment.appendChild(createUnmatchedSkuCard(sku, description));
                 }
-            });
-
-            productGrid.appendChild(fragment);
-
-            if (foundCount === 0 && unmatchedCount === 0 && fitmentProducts.length > 0) {
-                 elements.resultsContainer.innerHTML = '<p>No products could be processed or displayed. This might indicate an issue with SKUs or data mapping.</p>';
-            } else if (foundCount === 0 && unmatchedCount > 0) {
-                const summaryMessage = document.createElement('p');
-                summaryMessage.textContent = `Found ${unmatchedCount} part number(s) from your vehicle selection, but they are not currently available in this store.`;
-                summaryMessage.style.textAlign = 'center';
-                summaryMessage.style.marginBottom = 'var(--fitment-spacing-sm)';
-                elements.resultsContainer.insertBefore(summaryMessage, productGrid);
+            } else { // Promise was rejected (should be rare if fetchShopifyProductBySkuMultiStep catches its own errors)
+                unmatchedCount++;
+                // result.reason might contain error info. For simplicity, use SKU if available from context.
+                // This path implies a more fundamental issue with a promise not settling as expected.
+                const sku = result.reason?.sku || 'UNKNOWN_SKU_REJECTED';
+                const description = result.reason?.description || 'Unknown Description';
+                console.error(`Promise rejected for SKU '${sku}'. Reason:`, result.reason);
+                fragment.appendChild(createUnmatchedSkuCard(sku, description));
             }
-            // If foundCount > 0, the grid itself is the primary content.
-            // No specific message needed if some products are found, even if others are unmatched.
+        });
 
-        } catch (error) {
-            console.error('Error in displayResults while fetching or processing Shopify GraphQL data:', error);
-            // Display the error message to the user.
-            // displayError function prepends "Error: " so no need to add it here.
-            displayError(`${error.message}`, sectionId);
-            // Clear any skeletons and show a user-friendly message in the results area.
-            productGrid.innerHTML = ''; // Clear skeletons if any were left
-            elements.resultsContainer.innerHTML = `<p>Could not load product information. ${error.message.includes("credentials") ? "Please ensure API access is correctly configured." : "Please try again or contact support if the issue persists."}</p>`;
+        productGrid.appendChild(fragment);
+
+        if (foundCount === 0 && unmatchedCount === 0 && fitmentProducts.length > 0) {
+             elements.resultsContainer.innerHTML = '<p>No products could be processed or displayed.</p>';
+        } else if (foundCount === 0 && unmatchedCount > 0) {
+            const summaryMessage = document.createElement('p');
+            summaryMessage.textContent = `Found ${unmatchedCount} part number(s) from your vehicle selection, but they are not currently available in this store.`;
+            summaryMessage.style.textAlign = 'center';
+            summaryMessage.style.marginBottom = 'var(--fitment-spacing-sm)';
+            elements.resultsContainer.insertBefore(summaryMessage, productGrid);
         }
+        // No specific message if some products are found, even if others are unmatched.
     };
 
     // --- Event Listeners and Action Handlers ---
