@@ -15,13 +15,13 @@
   --fitment-border-color: #e9ecef;
   --fitment-input-border-color: #ced4da;
   --fitment-disabled-bg: #f8f9fa;
-  --fitment-disabled-color: #adb5bd; /* WCAG AA on --fitment-disabled-bg: No */ /* Consider darkening for better contrast */
+  --fitment-disabled-color: #555555; /* WCAG AA on --fitment-disabled-bg: Yes (5.07:1) */
   --fitment-error-color-text: #721c24; /* WCAG AA on --fitment-error-color-bg: Yes */
   --fitment-error-color-bg: #f8d7da;
   --fitment-error-color-border: #f5c6cb;
   --fitment-focus-ring-color: rgba(0, 123, 255, 0.25);
   --fitment-text-color-primary: #212529; /* WCAG AA on white: Yes */
-  --fitment-text-color-secondary: #6c757d; /* WCAG AA on white: Yes for large, No for normal */ /* Consider #555 or similar if used for important small text */
+  --fitment-text-color-secondary: #555555; /* WCAG AA on white: Yes (5.07:1) for normal text */
   --fitment-background-color: #ffffff;
   --fitment-card-background: #ffffff;
   --fitment-image-background: #f0f2f5; /* Slightly darker for better placeholder visibility */
@@ -131,7 +131,38 @@
 .fitment-results-container:has(.fitment-product-grid) { padding: 0; text-align: left; }
 
 /* --- Error Messages --- */
-.fitment-error, .fitment-error-message { margin-top: var(--fitment-spacing-md); padding: var(--fitment-spacing-sm) var(--fitment-spacing-md); border: 1px solid var(--fitment-error-color-border); border-left-width: 4px; border-radius: var(--fitment-border-radius-sm); color: var(--fitment-error-color-text); background-color: var(--fitment-error-color-bg); font-size: 0.9em; display: flex; align-items: center; gap: var(--fitment-spacing-sm); }
+.fitment-error, .fitment-error-message { margin-top: var(--fitment-spacing-md); padding: var(--fitment-spacing-sm) var(--fitment-spacing-md); border: 1px solid var(--fitment-error-color-border); border-left-width: 4px; border-radius: var(--fitment-border-radius-sm); color: var(--fitment-error-color-text); background-color: var(--fitment-error-color-bg); font-size: 0.9em; display: flex; flex-wrap: wrap; align-items: center; gap: var(--fitment-spacing-sm); }
+
+.fitment-try-again-button {
+  margin-left: var(--fitment-spacing-sm);
+  padding: var(--fitment-spacing-xs) var(--fitment-spacing-sm);
+  font-size: 0.9em; /* Relative to parent .fitment-error-message font-size */
+  font-weight: 500;
+  color: var(--fitment-primary-color);
+  background-color: transparent;
+  border: 1px solid var(--fitment-primary-color);
+  border-radius: var(--fitment-border-radius-sm);
+  cursor: pointer;
+  transition: background-color var(--fitment-transition-fast), color var(--fitment-transition-fast);
+}
+.fitment-try-again-button:hover,
+.fitment-try-again-button:focus-visible {
+  background-color: var(--fitment-primary-color);
+  color: var(--fitment-primary-text-color);
+  outline: none;
+}
+.fitment-try-again-button:focus-visible {
+  outline: 2px solid var(--fitment-primary-color);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 2px var(--fitment-focus-ring-color);
+}
+.fitment-try-again-button:disabled {
+  color: var(--fitment-disabled-color);
+  border-color: var(--fitment-disabled-color);
+  background-color: transparent;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
 
 
 /* ==========================================================================
