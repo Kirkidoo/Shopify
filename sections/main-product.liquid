@@ -1282,6 +1282,60 @@
         ]
       },
       {
+        "type": "product_fitment_status",
+        "name": "Product Fitment Status",
+        "limit": 1,
+        "settings": [
+          {
+            "type": "paragraph",
+            "content": "Displays product fitment information based on the last selected vehicle. Requires Gamma API settings to be configured in Theme Settings."
+          },
+          {
+            "type": "checkbox",
+            "id": "show_fitment_status",
+            "label": "Show Product Fitment Status",
+            "default": true,
+            "info": "Enable this to display the fitment status on product pages."
+          },
+          {
+            "type": "text",
+            "id": "fits_message",
+            "label": "Product Fits Message",
+            "default": "This product fits your {vehicle_name}.",
+            "info": "Use {vehicle_name} as a placeholder for the selected vehicle name."
+          },
+          {
+            "type": "text",
+            "id": "does_not_fit_message",
+            "label": "Product Does Not Fit Message",
+            "default": "This product does not fit your {vehicle_name}.",
+            "info": "Use {vehicle_name} as a placeholder for the selected vehicle name."
+          },
+          {
+            "type": "text",
+            "id": "no_vehicle_selected_message",
+            "label": "No Vehicle Selected Message",
+            "default": "Select your vehicle using the Product Finder to check fitment."
+          },
+          {
+            "type": "text",
+            "id": "api_error_message",
+            "label": "API Error Message",
+            "default": "Could not retrieve fitment information. Please try again later."
+          },
+          {
+            "type": "header",
+            "content": "t:sections.main_product.blocks.all.settings.styles_header.content"
+          },
+          {
+            "type": "checkbox",
+            "id": "show_bottom_divider",
+            "label": "t:sections.main_product.blocks.all.settings.show_bottom_divider.label",
+            "default": false
+          }
+        ]
+      },
+      {
         "type": "variants",
         "name": "t:sections.main_product.blocks.variants.name",
         "limit": 1,
