@@ -55,17 +55,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Validate required fields from localStorage
+    // Category is still needed for the API call, even if not displayed. Type is also used in API response validation.
     if (!lastSelectedVehicle || !lastSelectedVehicle.type || !lastSelectedVehicle.make || !lastSelectedVehicle.year || !lastSelectedVehicle.model || !lastSelectedVehicle.category) {
       console.warn('Product Fitment Status (' + sectionId + '): Last selected vehicle data from localStorage is incomplete.', lastSelectedVehicle);
-      displayMessage(noVehicleSelectedMessage, 'no-vehicle'); // Or a more specific error like "Incomplete vehicle selection."
+      displayMessage(noVehicleSelectedMessage, 'no-vehicle');
       return;
     }
 
-    const vehicleName = `${lastSelectedVehicle.year} ${lastSelectedVehicle.make} ${lastSelectedVehicle.model} (${lastSelectedVehicle.type} - ${lastSelectedVehicle.category}${lastSelectedVehicle.subCategory ? ' - ' + lastSelectedVehicle.subCategory : ''})`;
+    // Updated vehicleName construction - now only Year Make Model
+    const vehicleName = `${lastSelectedVehicle.year} ${lastSelectedVehicle.make} ${lastSelectedVehicle.model}`;
 
-    // --- Updated API Call Logic ---
-    // Endpoint: GET {{api_url}}/fitment/getFitmentProducts
-    // Key Parameters for this use case: make, year, model, category, subCategory (optional), itemList (for SKU)
+    // API Call Logic
     const apiUrl = new URL(`${apiBaseUrl.replace(/\/$/, '')}/fitment/getFitmentProducts`);
 
     apiUrl.searchParams.append('make', lastSelectedVehicle.make);
@@ -75,8 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (lastSelectedVehicle.subCategory) {
       apiUrl.searchParams.append('subCategory', lastSelectedVehicle.subCategory);
     }
-    apiUrl.searchParams.append('itemList', productSku); // Use itemList for the current product's SKU
-    // apiUrl.searchParams.append('type', lastSelectedVehicle.type); // Type is not a direct filter for getFitmentProducts, but response includes it.
+    apiUrl.searchParams.append('itemList', productSku);
 
     fetch(apiUrl.toString(), {
       method: 'GET',
@@ -87,18 +86,17 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .then(response => {
       if (!response.ok) {
-        // Attempt to get more info from response body for error logging
         return response.json().catch(() => null).then(errorBody => {
           const errorMsg = `API request failed with status ${response.status}.`;
           console.error('Product Fitment Status (' + sectionId + '): ' + errorMsg, errorBody);
-          throw new Error(errorMsg); // Re-throw to be caught by main .catch
+          throw new Error(errorMsg);
         });
       }
       return response.json();
     })
     .then(data => {
       if (data && data.data && Array.isArray(data.data.fitmentProducts)) {
-        // Check if the returned list of products (that fit the vehicle) contains our current productSku
+        // API response still contains 'type', so we use lastSelectedVehicle.type for matching
         const productIsFit = data.data.fitmentProducts.some(
           fitProduct => fitProduct.itemNumber === productSku && fitProduct.type === lastSelectedVehicle.type
         );
@@ -106,20 +104,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (productIsFit) {
           displayMessage(fitsMessage.replace('{vehicle_name}', vehicleName), 'fits');
         } else {
-          // Product SKU not found in the list of products that fit the selected vehicle
           displayMessage(doesNotFitMessage.replace('{vehicle_name}', vehicleName), 'does-not-fit');
         }
       } else if (data && data.status === 404) {
-        // This might indicate the API endpoint itself is wrong, or less likely, the vehicle itself isn't found.
-        // For this specific endpoint, a 404 is less likely for "no products fit" (that would be an empty array).
-        // More often, it's "product not found" or "no fitment data for THIS vehicle".
-        // Given our logic, if the vehicle itself was invalid, it should have been caught earlier by localStorage checks.
-        // So, if API returns products, but not ours, it's a "does not fit". If it returns empty, also "does not fit".
-        console.warn(`Product Fitment Status (${sectionId}): API returned an unexpected response or 404 for vehicle ${vehicleName} and SKU ${productSku}. Raw Response:`, data);
+        console.warn(`Product Fitment Status (${sectionId}): API returned an unexpected response or 404 for vehicle queries related to SKU ${productSku}. Raw Response:`, data);
         displayMessage(doesNotFitMessage.replace('{vehicle_name}', vehicleName), 'does-not-fit');
       }
       else {
-        // Fallback for unexpected API response structure
         console.warn('Product Fitment Status (' + sectionId + '): Unexpected API response structure.', data);
         displayMessage(apiErrorMessage, 'error');
       }
