@@ -56,7 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`[FitmentStatus ${sectionId}] Raw lastSelectedVehicle from localStorage:`, lastSelectedVehicleString);
 
     if (!lastSelectedVehicleString) {
-      displayMessage(noVehicleSelectedMessage, 'no-vehicle');
+      console.log(`[FitmentStatus ${sectionId}] No vehicle selected. Hiding container.`);
+      container.style.display = 'none'; // Hide the entire container
       return;
     }
 

@@ -12,6 +12,17 @@
     "main": {
       "type": "main-product",
       "blocks": {
+        "product_fitment_status_6wHedz": {
+          "type": "product_fitment_status",
+          "settings": {
+            "show_fitment_status": true,
+            "fits_message": "This product fits your {vehicle_name}.",
+            "does_not_fit_message": "This product does not fit your {vehicle_name}.",
+            "no_vehicle_selected_message": "",
+            "api_error_message": "Could not retrieve fitment information. Please try again later.",
+            "show_bottom_divider": true
+          }
+        },
         "title": {
           "type": "title",
           "settings": {
@@ -23,17 +34,6 @@
             "show_rating": true,
             "hide_empty_star_rating": true,
             "show_custom_badges": false,
-            "show_bottom_divider": true
-          }
-        },
-        "product_fitment_status_6wHedz": {
-          "type": "product_fitment_status",
-          "settings": {
-            "show_fitment_status": true,
-            "fits_message": "This product fits your {vehicle_name}.",
-            "does_not_fit_message": "This product does not fit your {vehicle_name}.",
-            "no_vehicle_selected_message": "",
-            "api_error_message": "Could not retrieve fitment information. Please try again later.",
             "show_bottom_divider": true
           }
         },
@@ -116,8 +116,8 @@
         }
       },
       "block_order": [
-        "title",
         "product_fitment_status_6wHedz",
+        "title",
         "custom_liquid_kxQjJw",
         "subtitle",
         "price",
