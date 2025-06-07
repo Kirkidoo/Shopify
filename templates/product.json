@@ -20,7 +20,7 @@
             "does_not_fit_message": "This product does not fit your {vehicle_name}.",
             "no_vehicle_selected_message": "",
             "api_error_message": "Could not retrieve fitment information. Please try again later.",
-            "show_bottom_divider": false
+            "show_bottom_divider": true
           }
         },
         "title": {
