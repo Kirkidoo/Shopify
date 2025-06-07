@@ -4,76 +4,166 @@
    ========================================================================== */
 
 /* --- Variables --- */
-/* Ensure to check color contrast for all text elements against their backgrounds using a contrast checker tool. */
+/* Fitment selector specific variables, mapped to theme variables where possible. */
 :root {
-  --fitment-primary-color: #007bff; /* WCAG AA on white: Yes for large text, borderline for normal */
-  --fitment-primary-color-darker: #0056b3;
-  --fitment-primary-text-color: #ffffff; /* WCAG AA on --fitment-primary-color: Yes */
-  --fitment-secondary-color: #6c757d; /* WCAG AA on white: Yes for large, No for normal */
-  --fitment-secondary-color-darker: #5a6268;
-  --fitment-secondary-text-color: #ffffff;
-  --fitment-border-color: #e9ecef;
-  --fitment-input-border-color: #ced4da;
-  --fitment-disabled-bg: #f8f9fa;
-  --fitment-disabled-color: #555555; /* WCAG AA on --fitment-disabled-bg: Yes (5.07:1) */
-  --fitment-error-color-text: #721c24; /* WCAG AA on --fitment-error-color-bg: Yes */
-  --fitment-error-color-bg: #f8d7da;
-  --fitment-error-color-border: #f5c6cb;
-  --fitment-focus-ring-color: rgba(0, 123, 255, 0.25);
-  --fitment-text-color-primary: #212529; /* WCAG AA on white: Yes */
-  --fitment-text-color-secondary: #555555; /* WCAG AA on white: Yes (5.07:1) for normal text */
-  --fitment-background-color: #ffffff;
-  --fitment-card-background: #ffffff;
-  --fitment-image-background: #f0f2f5; /* Slightly darker for better placeholder visibility */
-  --fitment-loading-spinner-color: var(--fitment-primary-color);
-  --fitment-stock-in-color: #198754; /* WCAG AA on its bg: Yes */
-  --fitment-stock-out-color: #dc3545; /* WCAG AA on its bg: Yes */
-  --fitment-stock-unknown-color: var(--fitment-text-color-secondary);
-  --fitment-spacing-unit: 1rem;
-  --fitment-spacing-xs: calc(var(--fitment-spacing-unit) * 0.3);
-  --fitment-spacing-sm: calc(var(--fitment-spacing-unit) * 0.6);
-  --fitment-spacing-md: calc(var(--fitment-spacing-unit) * 1.2);
-  --fitment-spacing-lg: calc(var(--fitment-spacing-unit) * 1.8);
-  --fitment-spacing-xl: calc(var(--fitment-spacing-unit) * 2.5);
-  --fitment-loading-spinner-size: 1.2em;
-  --fitment-border-radius-sm: 0.25rem;
-  --fitment-border-radius-md: 0.375rem;
-  --fitment-border-radius-lg: 0.5rem;
-  --fitment-box-shadow-light: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0,0,0,0.03);
-  --fitment-box-shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0,0,0,0.04);
-  --fitment-box-shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0,0,0,0.05);
+  /* Color Mappings to Theme Variables */
+  --fitment-primary-color: rgb(var(--color-accent-1)); /* Primary action color, e.g., for Find Parts button */
+  /* --fitment-primary-color-darker: rgb(var(--color-accent-1-darker)); */ /* Assuming theme might have a darker accent, or use JS to darken */
+  --fitment-primary-text-color: rgb(var(--color-button-text)); /* Text color for primary actions */
+
+  /* --fitment-secondary-color: rgba(var(--color-foreground), 0.75); */ /* For secondary UI elements, borders, etc. */
+  /* --fitment-secondary-color-darker: rgba(var(--color-foreground), 0.9); */
+  /* --fitment-secondary-text-color: rgb(var(--color-background)); */ /* Text on secondary colored backgrounds */
+
+  --fitment-border-color: var(--color-border); /* General border color */
+  --fitment-input-border-color: var(--color-border); /* Input specific border color, often same as general border */
+
+  --fitment-disabled-bg: rgb(var(--color-base-background-2)); /* Background for disabled elements */
+  --fitment-disabled-color: rgba(var(--color-base-text), 0.5); /* Text color for disabled elements (ensure 4.5:1 on disabled-bg) */
+
+  --fitment-error-color-text: var(--color-error); /* Text color for error messages */
+  --fitment-error-color-bg: var(--color-error-background); /* Background for error messages */
+  --fitment-error-color-border: var(--color-error); /* Border for error messages */
+
+  /* Focus ring: Rely on global theme styles (:focus-visible) where possible.
+     This variable might be used if a specific focus is needed that theme doesn't cover.
+     However, the theme's default focus should be preferred for consistency.
+     The theme uses: outline: 0.2rem solid rgba(var(--color-foreground), 0.85); box-shadow: 0 0 0 0.3rem rgba(var(--color-background), 0.5), ...;
+     For simplicity here, if a specific one is needed, it can be defined, but ideally not.
+     --fitment-focus-ring-color: rgba(var(--color-foreground), 0.25); (Removed, use theme default)
+  */
+
+  --fitment-text-color-primary: rgb(var(--color-foreground)); /* Primary text color */
+  --fitment-text-color-secondary: rgba(var(--color-foreground), 0.75); /* Secondary text color (e.g., labels, subtext) */
+
+  /* Backgrounds for the component itself and its parts like cards */
+  --fitment-background-color: rgb(var(--color-background)); /* Main background of the selector section */
+  --fitment-card-background: rgb(var(--color-background)); /* Background for product cards, could be background-2 for contrast */
+  --fitment-image-background: rgb(var(--color-base-background-2)); /* Placeholder bg for images */
+
+  --fitment-loading-spinner-color: rgb(var(--color-accent-1)); /* Color for loading spinners */
+
+  --fitment-stock-in-color: var(--color-success);
+  --fitment-stock-out-color: var(--color-error);
+  --fitment-stock-unknown-color: rgba(var(--color-foreground), 0.75); /* Same as secondary text */
+
+  /* Spacing: Mapped to theme's general spacing philosophy or specific variables if available.
+     Theme's base.css uses --spacing-base-1 (typically 1rem or 10px).
+     Let's use relative units or calc for flexibility if direct mapping isn't 1-to-1.
+     If --spacing-base-1 is 1rem:
+  */
+  --fitment-spacing-unit: 1rem; /* Base unit, can be var(--spacing-base-1) if that's defined as 1rem globally */
+  --fitment-spacing-xs: calc(var(--fitment-spacing-unit) * 0.25); /* Approx 0.25rem */
+  --fitment-spacing-sm: calc(var(--fitment-spacing-unit) * 0.5);  /* Approx 0.5rem */
+  --fitment-spacing-md: var(--fitment-spacing-unit);               /* Approx 1rem */
+  --fitment-spacing-lg: calc(var(--fitment-spacing-unit) * 1.5); /* Approx 1.5rem */
+  --fitment-spacing-xl: calc(var(--fitment-spacing-unit) * 2.5); /* Approx 2.5rem */
+
+  --fitment-loading-spinner-size: 1.2em; /* Relative to font size of context */
+
+  /* Border Radii: Mapped to theme variables */
+  --fitment-border-radius-sm: var(--border-radius-base); /* Or var(--inputs-radius) if more specific */
+  --fitment-border-radius-md: var(--buttons-radius); /* Or var(--inputs-radius) */
+  --fitment-border-radius-lg: var(--border-radius-base); /* For larger containers like the section itself or cards */
+
+  /* Box Shadows: Theme might have specific shadow variables or a utility class.
+     Theme uses `0 0.2rem 0 var(--color-box-shadow)` for inputs.
+     For cards/section, a softer, modern shadow might be:
+  */
+  --fitment-box-shadow-light: 0 0.1rem 0.3rem rgba(var(--color-base-text), 0.03), 0 0.1rem 0.2rem rgba(var(--color-base-text), 0.02);
+  --fitment-box-shadow-medium: 0 0.3rem 0.6rem rgba(var(--color-base-text), 0.04), 0 0.2rem 0.4rem rgba(var(--color-base-text), 0.03);
+  --fitment-box-shadow-hover: 0 0.5rem 1rem rgba(var(--color-base-text), 0.06), 0 0.3rem 0.6rem rgba(var(--color-base-text), 0.04);
+
+  /* Transitions: Keep these specific if not defined in theme, or map if available */
   --fitment-transition-fast: 0.15s ease-in-out;
   --fitment-transition-medium: 0.25s ease-in-out;
   --fitment-transition-slow: 0.35s ease-in-out;
   --fitment-collapse-transition: max-height var(--fitment-transition-slow), opacity var(--fitment-transition-slow);
-  --fitment-skeleton-bg: #e0e0e0;
-  --fitment-skeleton-highlight: #f5f5f5;
+
+  /* Skeleton loader colors - should contrast with card background */
+  --fitment-skeleton-bg: rgba(var(--color-base-text), 0.08);
+  --fitment-skeleton-highlight: rgba(var(--color-base-text), 0.15);
 }
 
 /* --- Main Container --- */
 .fitment-selector-wrapper {
-  padding: var(--fitment-spacing-md) 0;
+  /* The wrapper itself might not need padding if the section inside handles it,
+     or use theme's section vertical padding variables if available.
+     Using a standard theme spacing for now. */
+  padding: var(--spacing-section-vertical) 0; /* Assuming --spacing-section-vertical exists or use a value like 3rem or 5rem */
 }
 
 .fitment-selector-section {
-  max-width: 1400px; margin: 0 auto; padding: var(--fitment-spacing-lg); border: 1px solid var(--fitment-border-color); border-radius: var(--fitment-border-radius-lg); background-color: var(--fitment-background-color); box-shadow: var(--fitment-box-shadow-medium); box-sizing: border-box;
+  max-width: var(--page-width); /* Align with theme's page width */
+  margin: 0 auto;
+  padding: var(--spacing-base-1); /* Theme's base spacing unit for internal padding */
+  border: 1px solid var(--fitment-border-color); /* Mapped to --color-border */
+  border-radius: var(--fitment-border-radius-lg); /* Mapped to --border-radius-base */
+  background-color: var(--fitment-background-color); /* Mapped to rgb(var(--color-background)) */
+  box-shadow: var(--fitment-box-shadow-medium); /* Using custom fitment shadow, or map to a theme shadow if available e.g. var(--shadow-card) */
+  box-sizing: border-box;
 }
 
 /* --- Header Styling (Title + Toggle Button) --- */
 .fitment-header {
-   display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--fitment-spacing-md); gap: var(--fitment-spacing-md); flex-wrap: wrap;
+   display: flex;
+   justify-content: space-between;
+   align-items: center;
+   margin-bottom: var(--fitment-spacing-md); /* Local variable, maps to 1rem */
+   gap: var(--fitment-spacing-md);
+   flex-wrap: wrap;
 }
 
 .fitment-selector-title {
-  margin: 0; text-align: left; font-size: 1.3em; font-weight: 600; color: var(--fitment-text-color-primary); line-height: 1.3; flex-grow: 1;
+  margin: 0;
+  text-align: left; /* Keep or use theme's text alignment for headings */
+  /* Font properties from theme's heading styles (e.g., like an H3 or H4) */
+  font-family: var(--font-heading-family);
+  font-weight: var(--font-heading-weight);
+  font-size: calc(var(--font-heading-scale) * 2.0rem); /* Example: H3 might be 2.0rem to 2.4rem */
+  color: rgb(var(--color-foreground-alt)); /* Or var(--fitment-text-color-primary) if alt is too different */
+  line-height: calc(1 + 0.3 / max(1, var(--font-heading-scale))); /* From theme's h1-h6 styles */
+  letter-spacing: var(--font-heading-spacing);
+  text-transform: var(--font-heading-transform);
+  flex-grow: 1;
 }
 
 /* --- Toggle Button Styling --- */
 .fitment-toggle-button {
-  display: inline-flex; align-items: center; gap: var(--fitment-spacing-xs); padding: var(--fitment-spacing-xs) var(--fitment-spacing-sm); font-size: 0.9em; font-weight: 500; line-height: 1.4; color: var(--fitment-text-color-secondary); background-color: #f8f9fa; border: 1px solid var(--fitment-border-color); border-radius: var(--fitment-border-radius-md); cursor: pointer; transition: background-color var(--fitment-transition-fast), color var(--fitment-transition-fast), box-shadow var(--fitment-transition-fast); flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fitment-spacing-xs); /* Approx 0.25rem */
+  padding: calc(var(--fitment-spacing-xs) * 2) var(--fitment-spacing-sm); /* Approx 0.5rem 0.8rem, similar to small buttons */
+  font-size: calc(var(--font-body-scale) * 1.3rem); /* Theme's small text size */
+  font-weight: var(--font-body-weight); /* Regular or bold depending on theme's secondary buttons */
+  line-height: 1.4;
+  color: var(--fitment-text-color-secondary); /* Mapped to secondary text color */
+  background-color: rgb(var(--color-base-background-2)); /* A slightly off-white, or transparent */
+  border: 1px solid var(--fitment-border-color); /* Mapped */
+  border-radius: var(--fitment-border-radius-md); /* Mapped to --buttons-radius */
+  cursor: pointer;
+  transition: background-color var(--fitment-transition-fast), color var(--fitment-transition-fast);
+  flex-shrink: 0;
 }
-.fitment-toggle-button:hover { background-color: #e9ecef; color: var(--fitment-text-color-primary); box-shadow: var(--fitment-box-shadow-light); }
-.fitment-toggle-button .toggle-icon { width: 1em; height: 1em; transition: transform var(--fitment-transition-medium); transform-origin: center; }
+.fitment-toggle-button:hover,
+.fitment-toggle-button:focus-visible {
+  background-color: rgba(var(--color-foreground), 0.1); /* Subtle hover */
+  color: var(--fitment-text-color-primary);
+  border-color: var(--fitment-input-border-color); /* Slightly darker border on hover */
+}
+.fitment-toggle-button .toggle-icon {
+  width: 1em; /* Relative to button's font-size */
+  height: 1em;
+  transition: transform var(--fitment-transition-medium);
+  transform-origin: center;
+  color: currentColor; /* Inherits button text color */
+}
+/* Ensuring focus state is clear and uses theme patterns if possible */
+.fitment-toggle-button:focus-visible {
+  outline: 0.2rem solid var(--fitment-primary-color); /* Or use theme's global focus outline */
+  outline-offset: 0.1rem;
+  box-shadow: 0 0 0 0.2rem rgba(var(--color-foreground),0.25); /* Adapting focus ring color */
+}
 
 
 /* --- Collapsible Content Wrapper --- */
@@ -97,44 +187,189 @@
 /* --- Selectors Row Layouts --- */
 /* Using efficient class-based selectors. Avoid over-qualification. */
 .fitment-selectors-container {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--fitment-spacing-md); margin-bottom: var(--fitment-spacing-lg);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); /* Retain responsive grid */
+  gap: var(--grid-mobile-horizontal-spacing, var(--fitment-spacing-md)); /* Use theme grid gap or fallback */
+  margin-bottom: var(--fitment-spacing-lg); /* Approx 1.5rem */
 }
 
 /* --- Individual Selector Styling --- */
 .fitment-selector { display: flex; flex-direction: column; position: relative; }
-.fitment-selector label { display: block; margin-bottom: 2px; font-weight: 600; font-size: 0.85em; color: var(--fitment-text-color-secondary); text-transform: none; letter-spacing: normal; }
-.fitment-select { width: 100%; padding: var(--fitment-spacing-sm) var(--fitment-spacing-sm); padding-right: calc(var(--fitment-spacing-sm) * 2.5); font-size: 0.95em; line-height: 1.4; color: var(--fitment-text-color-primary); background-color: var(--fitment-background-color); background-clip: padding-box; border: 1px solid var(--fitment-input-border-color); border-radius: var(--fitment-border-radius-md); transition: border-color var(--fitment-transition-fast), box-shadow var(--fitment-transition-fast); appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%236c757d' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right var(--fitment-spacing-sm) center; background-size: 14px 10px; }
-.fitment-select:focus { border-color: var(--fitment-primary-color); outline: 0; box-shadow: 0 0 0 0.2rem var(--fitment-focus-ring-color); } /* Updated focus ring for better visibility */
-.fitment-select:disabled { background-color: var(--fitment-disabled-bg); color: var(--fitment-disabled-color); cursor: not-allowed; opacity: 0.75; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23adb5bd' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); }
+.fitment-selector label {
+  display: block;
+  margin-bottom: var(--fitment-spacing-xs); /* Approx 0.25rem */
+  font-family: var(--font-body-family); /* Ensuring labels use body font */
+  font-weight: var(--font-body-weight-bold, 600); /* Use theme bold or fallback */
+  font-size: calc(var(--font-body-scale) * 1.3rem); /* Theme's small-medium text */
+  color: var(--fitment-text-color-secondary); /* Mapped to secondary text color */
+  text-transform: none; /* Usually labels are not uppercase unless theme dictates */
+  letter-spacing: normal;
+}
+
+.fitment-select {
+  font-family: var(--font-body-family);
+  font-size: calc(var(--font-body-scale) * 1.4rem); /* Consistent with theme inputs */
+  color: var(--fitment-text-color-primary);
+  background-color: var(--fitment-background-color);
+  padding: 0.8rem 1.5rem; /* Match theme input padding if possible */
+  padding-right: 3.2rem; /* For dropdown arrow */
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--inputs-radius, var(--fitment-border-radius-md)); /* Theme input radius or fallback */
+  height: 4.2rem; /* Theme input height */
+  border: var(--inputs-border-width, 1px) solid var(--fitment-input-border-color); /* Theme input border */
+  box-shadow: var(--inputs-shadow, 0 0.2rem 0 var(--color-box-shadow)); /* Theme input shadow */
+  transition: border-color var(--fitment-transition-fast), box-shadow var(--fitment-transition-fast);
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 20px)ለውጥን ይመልከቱ 50%, calc(100% - 15px) 50%; /* Adjusted for better centering with padding */
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+/* Rely on global :focus-visible styles from base.css for .fitment-select */
+/* .fitment-select:focus { ... } - Removed to use global theme focus */
+
+.fitment-select:disabled {
+  background-color: var(--fitment-disabled-bg);
+  color: var(--fitment-disabled-color);
+  cursor: not-allowed;
+  opacity: 0.75;
+  /* Update disabled arrow color to match disabled text color */
+  background-image: linear-gradient(45deg, transparent 50%, var(--fitment-disabled-color) 50%), linear-gradient(135deg, var(--fitment-disabled-color) 50%, transparent 50%);
+}
 
 /* --- Action Buttons --- */
-.fitment-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--fitment-spacing-sm); margin-top: var(--fitment-spacing-md); }
-.fitment-button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--fitment-spacing-xs); font-weight: 600; text-align: center; vertical-align: middle; cursor: pointer; user-select: none; border: 1px solid transparent; padding: var(--fitment-spacing-sm) var(--fitment-spacing-lg); font-size: 0.95em; line-height: 1.5; border-radius: var(--fitment-border-radius-md); box-shadow: var(--fitment-box-shadow-light); transition: all var(--fitment-transition-medium); }
-.fitment-find-button { color: var(--fitment-primary-text-color); background-color: var(--fitment-primary-color); border-color: var(--fitment-primary-color); }
-.fitment-find-button:not(:disabled):hover { background-color: var(--fitment-primary-color-darker); border-color: var(--fitment-primary-color-darker); box-shadow: var(--fitment-box-shadow-medium); transform: translateY(-2px); }
-.fitment-reset-button { color: var(--fitment-text-color-secondary); background-color: #f8f9fa; border-color: var(--fitment-input-border-color); }
-.fitment-reset-button:not(:disabled):hover { color: var(--fitment-text-color-primary); background-color: #e9ecef; border-color: #adb5bd; box-shadow: var(--fitment-box-shadow-medium); transform: translateY(-2px); }
-.fitment-button:focus-visible { outline: 2px solid var(--fitment-primary-color); outline-offset: 2px; box-shadow: 0 0 0 3px var(--fitment-focus-ring-color); } /* Enhanced focus visibility */
-.fitment-button:disabled { background-color: var(--fitment-disabled-bg); border-color: var(--fitment-disabled-bg); color: var(--fitment-disabled-color); cursor: not-allowed; opacity: 0.65; box-shadow: none; transform: none; }
+.fitment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--grid-mobile-horizontal-spacing, var(--fitment-spacing-sm)); /* Theme grid gap or fallback */
+  margin-top: var(--fitment-spacing-lg); /* Approx 1.5rem */
+}
+
+.fitment-button { /* Base style for fitment buttons */
+  font-family: var(--font-buttons-family);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  text-decoration: none;
+  min-width: 12rem; /* Consistent with theme .button */
+  height: auto; /* Auto height based on padding */
+  font-size: calc(var(--font-body-scale) * 1.5rem); /* Theme button font size */
+  line-height: calc(1 + 0.2 / var(--font-body-scale)); /* Theme button line height */
+  border-radius: var(--buttons-radius, var(--fitment-border-radius-md)); /* Theme button radius */
+  font-weight: var(--font-bolder-weight); /* Theme button font weight */
+  text-transform: var(--font-buttons-transform);
+  padding: 1rem 1.5rem; /* Adjusted padding, closer to theme's default button */
+  transition: all var(--fitment-transition-medium);
+}
+
+.fitment-find-button { /* Primary action button */
+  color: var(--fitment-primary-text-color); /* Mapped to --color-button-text */
+  background-color: var(--fitment-primary-color); /* Mapped to --color-accent-1 */
+  border: 1px solid var(--fitment-primary-color); /* Border matches background */
+  box-shadow: 0 0.1rem 0.1rem rgba(0,0,0,0.1); /* Softer shadow */
+}
+.fitment-find-button:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--fitment-primary-color) 90%, black); /* Darken primary color */
+  border-color: color-mix(in srgb, var(--fitment-primary-color) 90%, black);
+  box-shadow: var(--fitment-box-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.fitment-reset-button { /* Secondary/tertiary action button */
+  color: var(--fitment-text-color-secondary); /* Mapped */
+  background-color: rgb(var(--color-base-background-2)); /* Theme's subtle bg */
+  border: 1px solid var(--fitment-input-border-color); /* Mapped */
+  box-shadow: 0 0.1rem 0.1rem rgba(0,0,0,0.05);
+}
+.fitment-reset-button:not(:disabled):hover {
+  background-color: rgba(var(--color-base-text), 0.1); /* Subtle hover */
+  color: var(--fitment-text-color-primary);
+  border-color: rgba(var(--color-base-text), 0.3);
+  box-shadow: var(--fitment-box-shadow-medium);
+  transform: translateY(-1px);
+}
+/* Rely on global :focus-visible for buttons */
+/* .fitment-button:focus-visible { ... } - Removed */
+
+.fitment-button:disabled {
+  background-color: var(--fitment-disabled-bg);
+  border-color: var(--fitment-disabled-bg);
+  color: var(--fitment-disabled-color);
+  cursor: not-allowed;
+  opacity: 0.65;
+  box-shadow: none;
+  transform: none;
+}
 
 /* --- Loading Indicators --- */
 @keyframes fitment-spinner { to { transform: rotate(360deg); } }
-.fitment-loading { font-size: 0.8em; margin-top: 2px; color: var(--fitment-text-color-secondary); display: inline-flex; align-items: center; gap: var(--fitment-spacing-xs); }
-.fitment-spinner { display: inline-block; width: var(--fitment-loading-spinner-size); height: var(--fitment-loading-spinner-size); border: 2px solid var(--fitment-loading-spinner-color); border-radius: 50%; border-top-color: transparent; animation: fitment-spinner 0.75s linear infinite; vertical-align: middle; }
+.fitment-loading {
+  font-size: calc(var(--font-body-scale) * 1.2rem); /* Slightly smaller than base body text */
+  margin-top: var(--fitment-spacing-xs);
+  color: var(--fitment-text-color-secondary); /* Mapped */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fitment-spacing-xs); /* Approx 0.25rem */
+}
+.fitment-spinner {
+  display: inline-block;
+  width: var(--fitment-loading-spinner-size); /* 1.2em of current font-size */
+  height: var(--fitment-loading-spinner-size);
+  border: 0.2em solid var(--fitment-loading-spinner-color); /* Mapped, slightly thicker border */
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: fitment-spinner 0.75s linear infinite;
+  vertical-align: middle;
+}
 /* Removed inline-loader and button-loader as JS toggles .is-loading on parent/button now */
 /* JS will handle showing/hiding the .fitment-type-loading, .fitment-category-loading etc. spans directly */
 
 
 /* --- Results Area --- */
-.fitment-results-container { margin-top: var(--fitment-spacing-lg); padding: var(--fitment-spacing-xs); border: none; background-color: transparent; text-align: center; transition: padding var(--fitment-transition-medium); }
-.fitment-results-container p { margin-top: 0; margin-bottom: 0; color: var(--fitment-text-color-secondary); font-style: italic; font-size: 0.9em; line-height: 1.4; }
-.fitment-results-container:has(.fitment-product-grid) { padding: 0; text-align: left; }
+.fitment-results-container {
+  margin-top: var(--fitment-spacing-lg); /* Approx 1.5rem */
+  padding: var(--fitment-spacing-xs); /* Approx 0.25rem, small padding for placeholder text */
+  border: none;
+  background-color: transparent;
+  text-align: center;
+  transition: padding var(--fitment-transition-medium);
+}
+.fitment-results-container p { /* Placeholder text styling */
+  margin-top: 0;
+  margin-bottom: 0;
+  color: var(--fitment-text-color-secondary); /* Mapped */
+  font-style: italic;
+  font-size: calc(var(--font-body-scale) * 1.4rem); /* Theme consistent text size */
+  line-height: var(--font-body-line-height, 1.5); /* Theme body line height */
+}
+.fitment-results-container:has(.fitment-product-grid) {
+  padding: 0; /* Remove padding when grid is present */
+  text-align: left; /* Align grid content to left */
+}
 
 /* --- Error Messages --- */
-.fitment-error, .fitment-error-message { margin-top: var(--fitment-spacing-md); padding: var(--fitment-spacing-sm) var(--fitment-spacing-md); border: 1px solid var(--fitment-error-color-border); border-left-width: 4px; border-radius: var(--fitment-border-radius-sm); color: var(--fitment-error-color-text); background-color: var(--fitment-error-color-bg); font-size: 0.9em; display: flex; flex-wrap: wrap; align-items: center; gap: var(--fitment-spacing-sm); }
+.fitment-error, .fitment-error-message {
+  margin-top: var(--fitment-spacing-md); /* Approx 1rem */
+  padding: var(--fitment-spacing-sm) var(--fitment-spacing-md); /* Approx 0.5rem 1rem */
+  border: 1px solid var(--fitment-error-color-border); /* Mapped to --color-error */
+  border-left-width: 0.4rem; /* Theme uses 0.1rem, but keeping thicker for emphasis */
+  border-radius: var(--fitment-border-radius-sm); /* Mapped to --border-radius-base */
+  color: var(--fitment-error-color-text); /* Mapped to --color-error */
+  background-color: var(--fitment-error-color-bg); /* Mapped to --color-error-background */
+  font-size: calc(var(--font-body-scale) * 1.4rem); /* Theme consistent text size */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fitment-spacing-sm); /* Approx 0.5rem */
+}
 
 .fitment-try-again-button {
-  margin-left: var(--fitment-spacing-sm);
+  margin-left: var(--fitment-spacing-sm); /* Approx 0.5rem */
   padding: var(--fitment-spacing-xs) var(--fitment-spacing-sm);
   font-size: 0.9em; /* Relative to parent .fitment-error-message font-size */
   font-weight: 500;
@@ -166,31 +401,150 @@
 
 
 /* ==========================================================================
-   Choices.js Integration Styles
+   Choices.js Integration Styles - Aligned with Theme
    ========================================================================== */
-.choices[data-type*="select-one"] { font-size: 0.95em; margin: 0; position: relative; }
-.choices__inner { display: inline-block; vertical-align: top; width: 100%; background-color: var(--fitment-background-color); border: 1px solid var(--fitment-input-border-color); border-radius: var(--fitment-border-radius-md); padding: var(--fitment-spacing-sm) var(--fitment-spacing-sm); padding-right: calc(var(--fitment-spacing-sm) * 2.5); font-size: inherit; min-height: auto; line-height: 1.4; overflow: hidden; transition: border-color var(--fitment-transition-fast), box-shadow var(--fitment-transition-fast); }
-.choices.is-open .choices__inner { border-radius: var(--fitment-border-radius-md) var(--fitment-border-radius-md) 0 0; border-color: var(--fitment-primary-color); }
-.choices.is-focused .choices__inner { border-color: var(--fitment-primary-color); box-shadow: 0 0 0 0.2rem var(--fitment-focus-ring-color); }
-.choices__list--single .choices__item { width: 100%; overflow: hidden; display: block; white-space: nowrap; text-overflow: ellipsis; padding: 0; line-height: inherit; }
-.choices__placeholder { color: var(--fitment-disabled-color); opacity: 1; }
-.choices__list--dropdown { border: 1px solid var(--fitment-border-color); border-top: none; border-radius: 0 0 var(--fitment-border-radius-md) var(--fitment-border-radius-md); background-color: var(--fitment-background-color); box-shadow: var(--fitment-box-shadow-medium); margin-top: -1px; z-index: 10; word-break: break-word; max-height: 250px; overflow-y: auto; } /* Added max-height and overflow */
-.choices__list[aria-expanded] { }
-.choices__list--dropdown .choices__item { font-size: 0.95em; padding: var(--fitment-spacing-xs) var(--fitment-spacing-sm); }
-.choices__item--selectable { padding-right: var(--fitment-spacing-sm); }
-.choices__list--dropdown .choices__item--selectable { padding-right: var(--fitment-spacing-sm); }
-.choices__list--dropdown .choices__item--selectable.is-highlighted { background-color: var(--fitment-primary-color); color: var(--fitment-primary-text-color); }
-.choices__input--cloned { font-size: 0.95em; background-color: var(--fitment-background-color); margin-bottom: var(--fitment-spacing-xs); padding: var(--fitment-spacing-xs) var(--fitment-spacing-sm); border: 1px solid var(--fitment-input-border-color); border-radius: var(--fitment-border-radius-sm); width: calc(100% - (var(--fitment-spacing-sm) * 2)); margin-left: var(--fitment-spacing-sm); margin-right: var(--fitment-spacing-sm); margin-top: var(--fitment-spacing-xs); }
-.choices[data-type*='select-one']::after { content: ''; height: 10px; width: 14px; border: none; position: absolute; right: calc(var(--fitment-spacing-md) * 1.1); top: 50%; margin-top: -6px; pointer-events: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%236c757d' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-size: contain; transition: transform 0.2s ease-in-out, opacity var(--fitment-transition-fast); z-index: 1; }
-.choices[data-type*='select-one'].is-open::after { transform: rotate(-180deg); margin-top: -4px; }
-.choices.is-disabled .choices__inner, .choices.is-disabled .choices__input { background-color: var(--fitment-disabled-bg); color: var(--fitment-disabled-color); cursor: not-allowed; opacity: 0.75; }
-.choices.is-disabled::after { opacity: 0.5; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23adb5bd' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M2 5l6 6 6-6'/%3e%3c/svg%3e"); }
+/* Base Choices.js container - match theme input font size */
+.choices[data-type*="select-one"] {
+  font-size: calc(var(--font-body-scale) * 1.4rem); /* Theme input font size */
+  margin: 0;
+  position: relative;
+}
+
+/* Inner container - style like a theme input field */
+.choices__inner {
+  display: inline-block;
+  vertical-align: top;
+  width: 100%;
+  background-color: var(--fitment-background-color); /* Mapped */
+  border: var(--inputs-border-width, 1px) solid var(--fitment-input-border-color); /* Mapped */
+  border-radius: var(--inputs-radius, var(--fitment-border-radius-md)); /* Mapped */
+  padding: 0.8rem 1.5rem; /* Theme input padding, adjust right for arrow */
+  padding-right: 3.2rem; /* Space for arrow */
+  font-size: inherit; /* Inherit from .choices container */
+  min-height: 4.2rem; /* Theme input height */
+  line-height: 1.4; /* Match .fitment-select */
+  overflow: hidden;
+  transition: border-color var(--fitment-transition-fast), box-shadow var(--fitment-transition-fast);
+  box-shadow: var(--inputs-shadow, 0 0.2rem 0 var(--color-box-shadow)); /* Theme input shadow */
+}
+
+/* State: Open - adjust border radius and color like focused input */
+.choices.is-open .choices__inner {
+  border-radius: var(--inputs-radius, var(--fitment-border-radius-md)) var(--inputs-radius, var(--fitment-border-radius-md)) 0 0;
+  border-color: var(--fitment-primary-color); /* Mapped */
+}
+
+/* State: Focused - Rely on global :focus-visible from base.css */
+/* .choices.is-focused .choices__inner { ... } - Removed */
+
+/* Selected item text style */
+.choices__list--single .choices__item {
+  width: 100%;
+  overflow: hidden;
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0; /* Padding is on .choices__inner */
+  line-height: inherit; /* Inherit from .choices__inner */
+  color: var(--fitment-text-color-primary); /* Mapped */
+}
+
+/* Placeholder text style */
+.choices__placeholder {
+  color: var(--fitment-disabled-color); /* Mapped */
+  opacity: 1;
+}
+
+/* Dropdown list style */
+.choices__list--dropdown {
+  border: 1px solid var(--fitment-border-color); /* Mapped */
+  border-top: none;
+  border-radius: 0 0 var(--inputs-radius, var(--fitment-border-radius-md)) var(--inputs-radius, var(--fitment-border-radius-md)); /* Mapped */
+  background-color: var(--fitment-background-color); /* Mapped */
+  box-shadow: var(--fitment-box-shadow-medium); /* Mapped */
+  margin-top: -1px; /* Overlap with input border */
+  z-index: 10;
+  word-break: break-word;
+  max-height: 250px;
+  overflow-y: auto;
+}
+.choices__list[aria-expanded] { } /* Keep for specificity if needed */
+
+/* Dropdown item style */
+.choices__list--dropdown .choices__item {
+  font-size: inherit; /* Inherit from .choices container */
+  padding: var(--fitment-spacing-sm) var(--fitment-spacing-md); /* Approx 0.5rem 1rem */
+  color: var(--fitment-text-color-primary); /* Mapped */
+}
+.choices__item--selectable { padding-right: var(--fitment-spacing-md); } /* Ensure padding consistency */
+.choices__list--dropdown .choices__item--selectable { padding-right: var(--fitment-spacing-md); }
+
+/* Highlighted dropdown item style */
+.choices__list--dropdown .choices__item--selectable.is-highlighted {
+  background-color: var(--fitment-primary-color); /* Mapped */
+  color: var(--fitment-primary-text-color); /* Mapped */
+}
+
+/* Search input within dropdown */
+.choices__input--cloned {
+  font-size: inherit; /* Inherit */
+  background-color: var(--fitment-background-color); /* Mapped */
+  margin-bottom: var(--fitment-spacing-sm); /* Approx 0.5rem */
+  padding: var(--fitment-spacing-sm); /* Approx 0.5rem */
+  border: 1px solid var(--fitment-input-border-color); /* Mapped */
+  border-radius: var(--fitment-border-radius-sm); /* Mapped */
+  width: calc(100% - (var(--fitment-spacing-sm) * 2)); /* Full width less padding */
+  margin-left: var(--fitment-spacing-sm);
+  margin-right: var(--fitment-spacing-sm);
+  margin-top: var(--fitment-spacing-sm);
+}
+
+/* Dropdown arrow - using theme's select arrow approach */
+.choices[data-type*='select-one']::after {
+  content: '';
+  height: 5px; /* From theme's select arrow */
+  width: 5px;  /* From theme's select arrow */
+  border: none; /* Theme uses background gradients for arrow */
+  position: absolute;
+  right: 1.5rem; /* Align with theme's select padding */
+  top: 50%;
+  margin-top: -0.25rem; /* Half of height */
+  pointer-events: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--fitment-text-color-secondary) 50%), linear-gradient(135deg, var(--fitment-text-color-secondary) 50%, transparent 50%);
+  background-position: center; /* Simpler positioning */
+  background-size: 5px 5px; /* Match theme arrow size */
+  background-repeat: no-repeat;
+  transition: transform 0.2s ease-in-out;
+  z-index: 1;
+}
+.choices[data-type*='select-one'].is-open::after {
+  transform: rotate(180deg);
+  margin-top: -0.25rem; /* Adjust if needed when rotated */
+}
+
+/* Disabled state for Choices.js */
+.choices.is-disabled .choices__inner,
+.choices.is-disabled .choices__input {
+  background-color: var(--fitment-disabled-bg); /* Mapped */
+  color: var(--fitment-disabled-color); /* Mapped */
+  cursor: not-allowed;
+  opacity: 0.75;
+  box-shadow: var(--inputs-shadow, 0 0.2rem 0 var(--color-box-shadow)); /* Keep shadow consistent */
+}
+.choices.is-disabled::after {
+  opacity: 0.5;
+  background-image: linear-gradient(45deg, transparent 50%, var(--fitment-disabled-color) 50%), linear-gradient(135deg, var(--fitment-disabled-color) 50%, transparent 50%);
+}
 
 
 /* ==========================================================================
-   Product Results Grid/Card Styling - Enhanced
+   Product Results Grid/Card Styling - Aligned with Theme
    ========================================================================== */
-.fitment-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--fitment-spacing-md); }
+.fitment-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Retain responsive grid */
+  gap: var(--grid-mobile-horizontal-spacing, var(--fitment-spacing-md)); /* Theme grid gap or fallback */
+}
 
 /* Product Card Fade-in Animation */
 @keyframes fadeIn {
@@ -202,79 +556,183 @@
   opacity: 0; /* Start hidden for animation */
 }
 
-.fitment-product-card { display: flex; flex-direction: column; border: 1px solid var(--fitment-border-color); border-radius: var(--fitment-border-radius-lg); text-decoration: none; color: inherit; background-color: var(--fitment-card-background); box-shadow: var(--fitment-box-shadow-medium); overflow: hidden; transition: box-shadow var(--fitment-transition-medium), transform var(--fitment-transition-medium); }
-.fitment-product-card:hover { box-shadow: var(--fitment-box-shadow-hover); transform: translateY(-4px); }
-.fitment-product-card:hover .fitment-product-image { transform: scale(1.03); }
+.fitment-product-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--fitment-border-color); /* Mapped */
+  border-radius: var(--fitment-border-radius-lg); /* Mapped */
+  text-decoration: none;
+  color: var(--fitment-text-color-primary); /* Mapped */
+  background-color: var(--fitment-card-background); /* Mapped */
+  /* Using theme's card shadow approach: inset 0 0 0 1px var(--color-border), 0 2px 0 var(--color-box-shadow);
+     Or a softer custom shadow if preferred and defined: var(--fitment-box-shadow-medium) */
+  box-shadow: inset 0 0 0 1px var(--color-border), 0 0.2rem 0 var(--color-box-shadow); /* Example from theme card */
+  overflow: hidden;
+  transition: box-shadow var(--fitment-transition-medium), transform var(--fitment-transition-medium);
+}
+.fitment-product-card:hover {
+  /* Adjust hover shadow based on theme's card hover, or use custom fitment variable */
+  box-shadow: var(--fitment-box-shadow-hover); /* Mapped custom shadow */
+  transform: translateY(-3px); /* Subtle lift */
+}
+.fitment-product-card:hover .fitment-product-image {
+  transform: scale(1.03);
+}
 
-.fitment-product-image-container { /* New container for better image loading UX */
+.fitment-product-image-container {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  background-color: var(--fitment-image-background); /* Subtle background while image loads */
-  border-bottom: 1px solid var(--fitment-border-color);
-  overflow: hidden; /* Ensure scaled image doesn't break layout */
+  aspect-ratio: 4 / 3; /* Common aspect ratio, adjust if needed */
+  background-color: var(--fitment-image-background); /* Mapped */
+  border-bottom: 1px solid var(--fitment-border-color); /* Mapped */
+  overflow: hidden;
   position: relative;
 }
 .fitment-product-image-container.image-load-error {
-    /* Optionally add specific styles if image fails, e.g. an icon */
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23cccccc' viewBox='0 0 24 24'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E");
     background-size: 40%;
     background-repeat: no-repeat;
     background-position: center;
 }
 
-.fitment-product-image { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform var(--fitment-transition-medium); }
+.fitment-product-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--fitment-transition-medium);
+}
 
-.fitment-product-info { padding: var(--fitment-spacing-sm) var(--fitment-spacing-md); display: flex; flex-direction: column; flex-grow: 1; gap: var(--fitment-spacing-xs); }
-.fitment-product-title { font-weight: 600; font-size: 0.95em; line-height: 1.3; color: var(--fitment-text-color-primary); margin-bottom: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; max-height: calc(1.3em * 2); flex-grow: 1; }
-.fitment-product-variant-title { display: block; font-size: 0.9em; font-weight: 400; color: var(--fitment-text-color-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fitment-product-stock { font-size: 0.85em; font-weight: 500; margin-top: auto; margin-bottom: 0; padding: 3px 8px; border-radius: var(--fitment-border-radius-sm); display: inline-block; text-align: center; line-height: 1.3; width: fit-content; align-self: flex-start; }
-.fitment-product-stock.stock-in { color: var(--fitment-stock-in-color); background-color: rgba(25, 135, 84, 0.1); border: 1px solid rgba(25, 135, 84, 0.2); }
-.fitment-product-stock.stock-out { color: var(--fitment-stock-out-color); background-color: rgba(220, 53, 69, 0.1); border: 1px solid rgba(220, 53, 69, 0.2); }
-.fitment-product-stock.stock-unknown, .fitment-product-stock.stock-other { color: var(--fitment-stock-unknown-color); background-color: rgba(108, 117, 125, 0.1); border: 1px solid rgba(108, 117, 125, 0.2); }
-.fitment-product-price { font-size: 1.05em; font-weight: bold; color: var(--fitment-text-color-primary); margin-top: 0; text-align: right; align-self: flex-end; }
-.fitment-product-not-found { border: 1px dashed var(--fitment-border-color); border-radius: var(--fitment-border-radius-md); padding: var(--fitment-spacing-sm); color: var(--fitment-text-color-secondary); font-size: 0.9em; text-align: center; background-color: var(--fitment-image-background); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--fitment-spacing-xs); }
-.fitment-product-not-found p { margin: 0; font-weight: 600; }
-.fitment-product-not-found strong { font-weight: 500; color: var(--fitment-text-color-primary); }
-.fitment-product-not-found small { font-size: 0.9em; }
+.fitment-product-info {
+  padding: var(--fitment-spacing-sm); /* Approx 0.5rem, use theme's card content padding if available */
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  gap: var(--fitment-spacing-xs); /* Approx 0.25rem */
+}
+.fitment-product-title {
+  font-family: var(--font-heading-family); /* Use heading font for product titles */
+  font-weight: var(--font-heading-weight);
+  font-size: calc(var(--font-body-scale) * 1.5rem); /* Or a theme specific card title size */
+  line-height: 1.3;
+  color: var(--fitment-text-color-primary); /* Mapped */
+  margin-bottom: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* max-height: calc(1.3em * 2); */ /* Let line-clamp handle height */
+  flex-grow: 1; /* Allow title to take space */
+}
+.fitment-product-variant-title {
+  display: block;
+  font-family: var(--font-body-family);
+  font-size: calc(var(--font-body-scale) * 1.3rem); /* Smaller than title */
+  font-weight: var(--font-body-weight);
+  color: var(--fitment-text-color-secondary); /* Mapped */
+  margin-top: var(--fitment-spacing-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fitment-product-stock {
+  font-family: var(--font-body-family);
+  font-size: calc(var(--font-body-scale) * 1.2rem); /* Theme small text */
+  font-weight: var(--font-body-weight-bold, 500);
+  margin-top: auto; /* Pushes to bottom if info area has space */
+  margin-bottom: var(--fitment-spacing-xs);
+  padding: var(--fitment-spacing-xs) var(--fitment-spacing-sm);
+  border-radius: var(--fitment-border-radius-sm); /* Mapped */
+  display: inline-block;
+  text-align: center;
+  line-height: 1.3;
+  width: fit-content;
+  align-self: flex-start;
+  text-transform: var(--font-badges-transform, uppercase); /* Theme badge transform */
+}
+.fitment-product-stock.stock-in {
+  color: var(--fitment-stock-in-color); /* Mapped to --color-success */
+  background-color: rgba(var(--color-success-rgb), 0.1); /* Use RGB version for opacity */
+  border: 1px solid rgba(var(--color-success-rgb), 0.2);
+}
+.fitment-product-stock.stock-out {
+  color: var(--fitment-stock-out-color); /* Mapped to --color-error */
+  background-color: rgba(var(--color-error-rgb), 0.1); /* Use RGB version for opacity */
+  border: 1px solid rgba(var(--color-error-rgb), 0.2);
+}
+.fitment-product-stock.stock-unknown, .fitment-product-stock.stock-other {
+  color: var(--fitment-stock-unknown-color); /* Mapped */
+  background-color: rgba(var(--color-foreground-rgb), 0.05); /* Subtle background */
+  border: 1px solid rgba(var(--color-foreground-rgb), 0.1);
+}
+.fitment-product-price {
+  font-family: var(--font-body-family);
+  font-size: calc(var(--font-body-scale) * 1.6rem); /* Prominent price */
+  font-weight: var(--font-bolder-weight);
+  color: var(--fitment-text-color-primary); /* Mapped */
+  margin-top: var(--fitment-spacing-xs);
+  text-align: right;
+  align-self: flex-end;
+}
+
+/* Styling for items not found */
+.fitment-product-not-found {
+  border: 1px dashed var(--fitment-border-color); /* Mapped */
+  border-radius: var(--fitment-border-radius-md); /* Mapped */
+  padding: var(--fitment-spacing-md); /* Approx 1rem */
+  color: var(--fitment-text-color-secondary); /* Mapped */
+  font-size: calc(var(--font-body-scale) * 1.4rem); /* Theme consistent text size */
+  text-align: center;
+  background-color: var(--fitment-image-background); /* Mapped */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--fitment-spacing-xs); /* Approx 0.25rem */
+  min-height: 150px; /* Give it some body */
+}
+.fitment-product-not-found p { margin: 0; font-weight: var(--font-body-weight-bold, 600); }
+.fitment-product-not-found strong { font-weight: var(--font-body-weight); color: var(--fitment-text-color-primary); }
+.fitment-product-not-found small { font-size: 0.9em; } /* Relative to parent */
 .fitment-product-not-found span { font-style: italic; }
 
-/* Skeleton Loader Styles */
+/* Skeleton Loader Styles - Aligned with Theme */
 @keyframes skeletonShimmer {
   0% { background-position: -200px 0; }
   100% { background-position: calc(200px + 100%) 0; }
 }
 .skeleton-card {
-  background-color: var(--fitment-card-background);
-  border: 1px solid var(--fitment-border-color);
-  border-radius: var(--fitment-border-radius-lg);
+  background-color: var(--fitment-card-background); /* Mapped */
+  border: 1px solid var(--fitment-border-color); /* Mapped */
+  border-radius: var(--fitment-border-radius-lg); /* Mapped */
   overflow: hidden;
 }
 .skeleton-image, .skeleton-line {
-  background-image: linear-gradient(90deg, var(--fitment-skeleton-bg) 25%, var(--fitment-skeleton-highlight) 50%, var(--fitment-skeleton-bg) 75%);
+  background-image: linear-gradient(90deg, var(--fitment-skeleton-bg) 25%, var(--fitment-skeleton-highlight) 50%, var(--fitment-skeleton-bg) 75%); /* Mapped */
   background-size: 200px 100%;
   animation: skeletonShimmer 1.5s infinite linear;
 }
 .skeleton-image {
   width: 100%;
   aspect-ratio: 4 / 3;
-  background-color: var(--fitment-skeleton-bg);
-  border-bottom: 1px solid var(--fitment-border-color);
+  background-color: var(--fitment-skeleton-bg); /* Mapped */
+  border-bottom: 1px solid var(--fitment-border-color); /* Mapped */
 }
 .skeleton-info {
-  padding: var(--fitment-spacing-sm) var(--fitment-spacing-md);
+  padding: var(--fitment-spacing-sm); /* Consistent with card info padding */
   display: flex;
   flex-direction: column;
-  gap: calc(var(--fitment-spacing-xs) * 1.5);
+  gap: var(--fitment-spacing-sm); /* Increased gap slightly */
 }
 .skeleton-line {
-  height: 1em;
-  border-radius: var(--fitment-border-radius-sm);
-  background-color: var(--fitment-skeleton-bg);
+  height: 1.2em; /* Slightly taller for better visual */
+  border-radius: var(--fitment-border-radius-sm); /* Mapped */
+  background-color: var(--fitment-skeleton-bg); /* Mapped */
 }
-.skeleton-line.title { width: 70%; height: 1.2em; margin-bottom: var(--fitment-spacing-xs); }
+.skeleton-line.title { width: 70%; height: 1.5em; margin-bottom: var(--fitment-spacing-xs); } /* Taller title */
 .skeleton-line.short { width: 50%; }
-.skeleton-line.price { width: 30%; height: 1.1em; margin-top: var(--fitment-spacing-xs); align-self: flex-end; }
+.skeleton-line.price { width: 30%; height: 1.3em; margin-top: var(--fitment-spacing-xs); align-self: flex-end; }
 
 
 /* --- Responsiveness --- */
