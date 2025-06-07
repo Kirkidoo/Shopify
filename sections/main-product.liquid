@@ -576,6 +576,12 @@
                     {% endif %}
                   </div>
                 {% endunless %}
+              {% when 'product_fitment_status' %}
+                {% if block.settings.show_fitment_status %}
+                  <div class="product-block {% if block.settings.show_bottom_divider %}has-divider{% endif %}" {{ block.shopify_attributes }}>
+                    {% render 'product-fitment-status', block: block, product: product %}
+                  </div>
+                {% endif %}
               {%- when 'variants' -%}
                 {% render 'product-variant-picker',
                   section: section,
