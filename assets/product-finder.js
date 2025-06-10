@@ -1294,19 +1294,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none';
     });
     elements.modelSelect?.addEventListener('change', (event) => {
-      resetSubsequentDropdowns('model');
-      // saveSelectedVehicle(); // Removed: Save only on explicit action
+      resetSubsequentDropdowns('model'); // This will disable findPartsButton and saveVehicleButton initially
+
+      const modelValue = event.target.value;
+      const typeValue = elements.typeSelect?.value;
+      const categoryValue = elements.categorySelect?.value;
+      const makeValue = elements.makeSelect?.value;
+      const yearValue = elements.yearSelect?.value;
+
       // Enable find parts button and save vehicle button if all selections are made
-      if (event.target.value && elements.typeSelect?.value && elements.categorySelect?.value && elements.makeSelect?.value && elements.yearSelect?.value) {
+      if (modelValue && typeValue && categoryValue && makeValue && yearValue) {
         if(elements.findPartsButton) elements.findPartsButton.disabled = false;
         if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'inline-block';
       } else {
+        // This else might be redundant if resetSubsequentDropdowns already handles disabling, but kept for clarity
         if(elements.findPartsButton) elements.findPartsButton.disabled = true;
         if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none';
       }
     });
 
-    elements.findPartsButton?.addEventListener('click', performSearch); // performSearch already calls saveSelectedVehicle
+    elements.findPartsButton?.addEventListener('click', performSearch);
     elements.resetButton?.addEventListener('click', resetAllSelectorsAndResults);
 
     // Event listener for the new "Save This Vehicle" button
@@ -1326,11 +1333,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- Toggle Button Logic ---
-    const setInitialToggleState = () => {
+    const setInitialToggleState = (key) => { // Accept key as a parameter
         if (!isToggleEnabled || !elements.toggleButton) return;
         let isInitiallyCollapsed;
         try {
-            const savedState = localStorage.getItem(storageKey);
+            const savedState = localStorage.getItem(key); // Use the passed key
             if (savedState === 'true') isInitiallyCollapsed = true;
             else if (savedState === 'false') isInitiallyCollapsed = false;
             else isInitiallyCollapsed = window.innerWidth < DESKTOP_BREAKPOINT;
@@ -1347,10 +1354,11 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const isNowCollapsed = section.classList.toggle('is-collapsed');
             elements.toggleButton.setAttribute('aria-expanded', String(!isNowCollapsed));
-            try { localStorage.setItem(storageKey, String(isNowCollapsed)); }
+            // Use sectionStates[sectionId].storageKey for setting item, as it's the correct key for this section
+            try { localStorage.setItem(sectionStates[sectionId].storageKey, String(isNowCollapsed)); }
             catch (error) { console.warn(`Could not save toggle state for ${sectionId} to localStorage:`, error); }
         });
-        setInitialToggleState();
+        setInitialToggleState(sectionStates[sectionId].storageKey); // Pass the correct key
     }
 
     // --- Saved Vehicle Dropdown & Prefill Logic ---
@@ -1557,7 +1565,7 @@ document.addEventListener('DOMContentLoaded', () => {
       resetSelect(elements.makeSelect, PLACEHOLDERS.MAKE, true);
       resetSelect(elements.yearSelect, PLACEHOLDERS.YEAR, true);
       resetSelect(elements.modelSelect, PLACEHOLDERS.MODEL, true);
-      if(elements.findPartsButton) elements.findPartsButton.disabled = true;
+      if(elements.findPartsButton) elements.findPartsButton.disabled = true; // Ensure Find Parts is disabled
       if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none'; // Hide save button during type loading too
 
       const cacheKey = 'types'; // Cache key for vehicle types
@@ -1665,12 +1673,29 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('userSavedVehiclesChanged', () => {
         if (document.body.contains(elements.savedVehicleSelectorWrapper)) { // Check if element is still in DOM
             console.log(`[ProductFinder ${sectionId}] 'userSavedVehiclesChanged' event detected. Repopulating saved vehicles dropdown.`);
-            populateSavedVehicleDropdown(elements, sectionId);
-            // After repopulating, if no vehicle is selected in the dropdown (e.g. all cleared), reset main selectors.
-            if (!elements.savedVehicleSelect.value) {
-                console.log(`[ProductFinder ${sectionId}] No vehicle selected in dropdown after userSavedVehiclesChanged. Resetting selectors.`);
-                resetAllSelectorsAndResults(); // Or a lighter reset if preferred.
+            populateSavedVehicleDropdown(elements, sectionId); // This will also hide the dropdown if no vehicles are saved.
+
+            // Check the actual source of truth (localStorage) to decide if a full reset is warranted.
+            const savedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+            let savedVehicles = [];
+            if (savedVehiclesString) {
+                try {
+                    savedVehicles = JSON.parse(savedVehiclesString);
+                    if (!Array.isArray(savedVehicles)) savedVehicles = [];
+                } catch (e) {
+                    savedVehicles = []; // Treat parse error as no vehicles
+                }
             }
+
+            if (savedVehicles.length === 0) {
+                console.log(`[ProductFinder ${sectionId}] All saved vehicles have been cleared. Resetting main selectors.`);
+                // Call a version of reset that doesn't re-dispatch 'userSavedVehiclesChanged' if possible,
+                // or ensure resetAllSelectorsAndResults's dispatch is safe (it is, as this listener just re-evaluates).
+                resetAllSelectorsAndResults();
+            }
+            // If there are still vehicles, but none is selected in this finder's "My Saved Vehicles" dropdown
+            // (e.g. user selected "-- Select --"), we should NOT reset the main finder.
+            // The main finder might be in use for a new, unsaved vehicle configuration.
         }
     });
 
