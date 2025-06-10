@@ -38,14 +38,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Adapted displayMessage to take placeholderElem and currentSectionId
     const displayMessage = (message, type = 'info', placeholderElem, currentSectionId) => {
-      // Use currentSectionId for logging, not the one from the outer scope if it differs (though unlikely here)
       console.log(`[FitmentStatus ${currentSectionId || sectionId}] Displaying message: "${message}", type: ${type}`);
       if (placeholderElem) {
+        // Reset to base class then add specific type class
+        placeholderElem.className = 'fitment-status-message';
+        placeholderElem.classList.add(`type-${type}`);
         placeholderElem.textContent = message;
-        placeholderElem.className = `fitment-status-message type-${type}`;
       } else {
         console.error(`[FitmentStatus ${currentSectionId || sectionId}] Placeholder element not found! Attempting to write to container.`);
-        // Fallback: find container by sectionId if possible, or use the initial 'container'
         const targetContainer = document.querySelector(`[data-section-id="${currentSectionId}"]`) || container;
         if (targetContainer) {
             targetContainer.innerHTML = `<p class="fitment-status-message type-${type}">${message}</p>`;
@@ -262,76 +262,102 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- End of new logic ---
 
     document.addEventListener('activeVehicleChanged', (event) => {
-      if (!document.body.contains(container)) return; // Container no longer in DOM
+      if (!document.body.contains(container)) {
+        return;
+      }
+      console.log(`[FitmentStatus ${sectionId}] Event 'activeVehicleChanged' detected. Detail:`, event.detail);
 
-      const currentProductSku = container.dataset.productSku; // Re-fetch from data attribute
+      const currentProductSku = container.dataset.productSku;
       const currentApiToken = container.dataset.apiToken;
       const currentApiBaseUrl = container.dataset.apiBaseUrl;
-      const currentPlaceholder = container.querySelector('.fitment-status-placeholder');
+      const currentPlaceholder = container.querySelector('.fitment-status-placeholder'); // Re-query inside handler
+
+      if (!currentProductSku) {
+        console.warn(`[FitmentStatus ${sectionId}] Product SKU not found on container. Cannot update fitment status.`);
+        if(currentPlaceholder) displayMessage("Fitment status cannot be determined: product data missing.", 'error', currentPlaceholder, sectionId);
+        return;
+      }
+      if (!currentApiToken || !currentApiBaseUrl) {
+        console.warn(`[FitmentStatus ${sectionId}] API token or base URL missing. Cannot update fitment status.`);
+        if(currentPlaceholder) displayMessage("Fitment status cannot be determined: API configuration missing.", 'error', currentPlaceholder, sectionId);
+        return;
+      }
+      if (!currentPlaceholder) {
+        console.warn(`[FitmentStatus ${sectionId}] Placeholder element not found. Cannot display fitment status.`);
+        return;
+      }
+
+      const existingProductPageDropdown = container.querySelector('.fitment-vehicle-selector-area');
+      if (existingProductPageDropdown) {
+        existingProductPageDropdown.remove();
+        console.log(`[FitmentStatus ${sectionId}] Removed product-page specific vehicle selector.`);
+      }
+
+      // Re-fetch message strings from dataset at the time of event handling
       const currentFitsMessage = container.dataset.fitsMessage || "This product fits your {vehicle_name}.";
       const currentDoesNotFitMessage = container.dataset.doesNotFitMessage || "This product does not fit your {vehicle_name}.";
       const currentApiErrorMessage = container.dataset.apiErrorMessage || "Could not retrieve fitment information. Please try again later.";
-      const currentNoVehicleSelectedMessage = container.dataset.noVehicleSelectedMessage || "Select your vehicle using the Product Finder to check fitment.";
+      let currentNoVehicleSelectedMessage = container.dataset.noVehicleSelectedMessage || "Select your vehicle to check fitment."; // Default used if event.detail is null
 
       if (event.detail && event.detail.vehicle) {
         const newActiveVehicle = event.detail.vehicle;
-        console.log(`[FitmentStatus ${sectionId}] Detected active vehicle change from header:`, newActiveVehicle.name);
+        console.log(`[FitmentStatus ${sectionId}] New active vehicle received:`, newActiveVehicle);
 
-        const existingProductPageDropdown = container.querySelector('.fitment-vehicle-selector-area');
-        if (existingProductPageDropdown) existingProductPageDropdown.remove();
+        checkFitmentForVehicle(
+          newActiveVehicle,
+          currentProductSku,
+          currentApiToken,
+          currentApiBaseUrl,
+          currentFitsMessage,
+          currentDoesNotFitMessage,
+          currentApiErrorMessage,
+          currentNoVehicleSelectedMessage, // This specific message might not be used if vehicle is present
+          currentPlaceholder,
+          sectionId
+        );
+      } else {
+        console.log(`[FitmentStatus ${sectionId}] Active vehicle was cleared or not provided in event.`);
+        // If active vehicle is cleared, we should re-evaluate the UI.
+        // This means checking localStorage for any remaining saved vehicles.
+        // For simplicity in this step, just display "no vehicle selected".
+        // A more advanced implementation might re-trigger the logic that shows the dropdown if savedVehicles.length > 1
+        displayMessage(currentNoVehicleSelectedMessage, 'no-vehicle', currentPlaceholder, sectionId);
 
-        if (currentProductSku && currentApiToken && currentApiBaseUrl && currentPlaceholder) {
-             checkFitmentForVehicle(
-                newActiveVehicle,
-                currentProductSku,
-                currentApiToken,
-                currentApiBaseUrl,
-                currentFitsMessage,
-                currentDoesNotFitMessage,
-                currentApiErrorMessage,
-                currentNoVehicleSelectedMessage,
-                currentPlaceholder,
-                sectionId
-            );
-        } else {
-            console.warn(`[FitmentStatus ${sectionId}] Cannot re-check fitment on activeVehicleChanged due to missing current data attributes or placeholder.`);
+        // Attempt to re-initialize UI for this container if active vehicle is cleared
+        // This will re-evaluate if the product-page dropdown should be shown
+        const currentSavedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+        let currentSavedVehicles = [];
+        if (currentSavedVehiclesString) {
+            try {
+                currentSavedVehicles = JSON.parse(currentSavedVehiclesString);
+                if (!Array.isArray(currentSavedVehicles)) currentSavedVehicles = [];
+            } catch(e) {
+                console.error(`[FitmentStatus ${sectionId}] Error parsing savedVehicles for UI re-evaluation:`, e);
+                currentSavedVehicles = [];
+            }
         }
-      } else if (event.detail && event.detail.vehicle === null) {
-          console.log(`[FitmentStatus ${sectionId}] Active vehicle was cleared by header.`);
-          const existingProductPageDropdown = container.querySelector('.fitment-vehicle-selector-area');
-          if (existingProductPageDropdown) existingProductPageDropdown.remove(); // Remove product page dropdown if active is cleared
 
-          // Re-evaluate UI: if multiple vehicles still exist, show product-page dropdown, else "no vehicle"
-          const currentSavedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
-          let currentSavedVehicles = [];
-          if (currentSavedVehiclesString) {
-              try { currentSavedVehicles = JSON.parse(currentSavedVehiclesString);
-                    if(!Array.isArray(currentSavedVehicles)) currentSavedVehicles = [];
-              } catch(e) { /* ignore */ }
-          }
-
-          if (currentSavedVehicles.length > 1) {
-            // Re-invoke the logic to build the product-page dropdown
-            // This is a bit repetitive, could be refactored into a function `initializeContainerUI(container, savedVehicles)`
-            // For now, direct call to the existing logic block (which needs to be available or duplicated)
-            // This part is tricky because the original savedVehicles variable is out of scope.
-            // Simplification: just show "no vehicle" and let page reload/navigation handle full re-init.
-             displayMessage(currentNoVehicleSelectedMessage, 'no-vehicle', currentPlaceholder, sectionId);
-             console.warn(`[FitmentStatus ${sectionId}] Active vehicle cleared. Product page dropdown logic would need full savedVehicles list to re-render if needed. For now, showing 'no vehicle'.`);
-          } else if (currentSavedVehicles.length === 1) {
-            // If one vehicle remains, it should have become active. This event (vehicle: null) might be followed by (vehicle: newActive).
-            // Or, if product-finder.js set the last remaining one active, this component might not even see vehicle:null.
-            // For robustness, if there is one vehicle, check it.
+        if (currentSavedVehicles.length > 1) {
+            // Re-create the product-page dropdown. This logic is simplified here.
+            // Ideally, the original dropdown creation logic would be callable.
+            // For now, we'll just log and keep the "no vehicle selected" message.
+            console.log(`[FitmentStatus ${sectionId}] Active vehicle cleared. Multiple vehicles still saved. Product page dropdown should ideally reappear.`);
+            // displayMessage("Select a vehicle from the list to check fitment.", 'info', currentPlaceholder, sectionId); // More accurate message
+            // The original dropdown creation logic is complex and tied to the initial forEach loop.
+            // A full re-initialization of this specific container would be better if this state is critical.
+        } else if (currentSavedVehicles.length === 1) {
+            // If only one vehicle remains, it should become active (product-finder.js logic should handle this).
+            // And this event listener should shortly receive another 'activeVehicleChanged' with that vehicle.
+            // Or, we can directly check it here.
+             console.log(`[FitmentStatus ${sectionId}] Active vehicle cleared, but one vehicle remains in storage. Attempting to check it.`);
              checkFitmentForVehicle(
                 currentSavedVehicles[0],
                 currentProductSku, currentApiToken, currentApiBaseUrl,
                 currentFitsMessage, currentDoesNotFitMessage, currentApiErrorMessage, currentNoVehicleSelectedMessage,
                 currentPlaceholder, sectionId
             );
-          }
-          else {
-            displayMessage(currentNoVehicleSelectedMessage, 'no-vehicle', currentPlaceholder, sectionId);
-          }
+        }
+        // If currentSavedVehicles.length is 0, the "no vehicle" message is already appropriate.
       }
     });
   });
