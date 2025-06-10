@@ -270,6 +270,25 @@
                 </a>
               {%- endif -%}
 
+              {%- comment -%}
+                Placeholder for 'Clear My Vehicles' link.
+                Actual rendering and behavior will be controlled by JavaScript.
+              {%- endcomment -%}
+              <div class="head-slot-nav-link head-slot-nav-link-clear-vehicles" id="clear-saved-vehicles-container" style="display: none;">
+                <a href="#" id="clear-saved-vehicles-link" class="head-slot-nav-link">
+                  {% render 'icons', icon: 'trash' %} <span class="head-slot-nav-link-label">Clear My Vehicles</span>
+                </a>
+              </div>
+
+              {%- comment -%}
+                Placeholder for 'My Vehicle' dropdown.
+                Actual rendering and behavior will be controlled by JavaScript.
+              {%- endcomment -%}
+              <div class="head-slot-nav-link head-slot-nav-link-my-vehicle" id="my-vehicle-dropdown-container" style="display: none; margin-left: 10px; align-items: center;">
+                <label for="my-vehicle-select" style="margin-right: 5px; font-size: var(--main-navigation-font-size, 13px); margin-bottom: 0;">My Vehicle:</label>
+                <select id="my-vehicle-select" name="my-vehicle-select" style="padding: 5px; border-radius: 3px; font-size: var(--main-navigation-font-size, 13px); line-height: 1; height: auto; min-height: unset;"></select>
+              </div>
+
               {% unless settings.catalog_enabled %}
                 <drawer-toggle
                   id="mini-cart-toggle"
@@ -990,3 +1009,165 @@
     ]
   }
 {% endschema %}
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const SAVED_VEHICLES_STORAGE_KEY = 'userSavedVehicles';
+    const ACTIVE_VEHICLE_ID_STORAGE_KEY = 'activeVehicleId';
+    const clearVehiclesContainer = document.getElementById('clear-saved-vehicles-container');
+    const clearVehiclesLink = document.getElementById('clear-saved-vehicles-link');
+    const myVehicleDropdownContainer = document.getElementById('my-vehicle-dropdown-container');
+    const myVehicleSelect = document.getElementById('my-vehicle-select');
+
+    function updateClearVehiclesLinkVisibility() {
+      if (!clearVehiclesContainer) return;
+      try {
+        const savedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+        if (savedVehiclesString) {
+          const savedVehicles = JSON.parse(savedVehiclesString);
+          if (Array.isArray(savedVehicles) && savedVehicles.length > 0) {
+            clearVehiclesContainer.style.display = 'inline-block'; // Or 'block' or 'flex' depending on styling
+          } else {
+            clearVehiclesContainer.style.display = 'none';
+          }
+        } else {
+          clearVehiclesContainer.style.display = 'none';
+        }
+      } catch (e) {
+        console.error('Error checking saved vehicles for link visibility:', e);
+        clearVehiclesContainer.style.display = 'none';
+      }
+    }
+
+    function populateMyVehicleDropdown() {
+      if (!myVehicleSelect || !myVehicleDropdownContainer) return;
+
+      try {
+        const savedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+        const activeVehicleId = localStorage.getItem(ACTIVE_VEHICLE_ID_STORAGE_KEY);
+        myVehicleSelect.innerHTML = ''; // Clear existing options
+
+        if (savedVehiclesString) {
+          const savedVehicles = JSON.parse(savedVehiclesString);
+          if (Array.isArray(savedVehicles) && savedVehicles.length > 0) {
+
+            // Add a default, non-selectable option if no active vehicle or if active vehicle isn't in list
+            // This can also serve as a prompt if the activeVehicleId is somehow invalid.
+            let activeVehicleInList = activeVehicleId ? savedVehicles.some(v => String(v.id) === activeVehicleId) : false;
+
+            if (!activeVehicleId || !activeVehicleInList) {
+                // If no active ID, or active ID not in current list, don't add a "Select Vehicle"
+                // Instead, the first vehicle in the list will become selected by default by the browser,
+                // and we can formalize this by setting it as active if desired.
+                // For now, just populate. If activeVehicleId is valid, it will be selected below.
+            }
+
+            savedVehicles.forEach(vehicle => {
+              if (vehicle && vehicle.id && vehicle.name) { // Basic validation
+                const option = document.createElement('option');
+                option.value = String(vehicle.id); // Ensure value is string
+                option.textContent = vehicle.name || 'Unnamed Vehicle';
+                myVehicleSelect.appendChild(option);
+              }
+            });
+
+            if (activeVehicleId && activeVehicleInList) {
+              myVehicleSelect.value = activeVehicleId;
+            } else if (savedVehicles.length > 0 && savedVehicles[0] && savedVehicles[0].id) {
+              // If no valid active ID, make the first vehicle in the list active
+              const firstVehicleId = String(savedVehicles[0].id);
+              myVehicleSelect.value = firstVehicleId;
+              localStorage.setItem(ACTIVE_VEHICLE_ID_STORAGE_KEY, firstVehicleId);
+              // No need to dispatch 'activeVehicleChanged' here as this is a silent auto-correction/initialization.
+            }
+
+            myVehicleDropdownContainer.style.display = 'inline-flex'; // Or 'flex'
+          } else {
+            myVehicleDropdownContainer.style.display = 'none';
+          }
+        } else {
+          myVehicleDropdownContainer.style.display = 'none';
+        }
+      } catch (e) {
+        console.error('Error populating My Vehicle dropdown:', e);
+        if(myVehicleDropdownContainer) myVehicleDropdownContainer.style.display = 'none';
+      }
+    }
+
+    if (clearVehiclesLink && clearVehiclesContainer) {
+      clearVehiclesLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (confirm('Are you sure you want to clear all your saved vehicles? This action cannot be undone.')) {
+          try {
+            localStorage.removeItem(SAVED_VEHICLES_STORAGE_KEY);
+            localStorage.removeItem(ACTIVE_VEHICLE_ID_STORAGE_KEY); // Also clear active vehicle ID
+            // Also remove the old key for cleanup, if it might exist
+            localStorage.removeItem('lastSelectedVehicle');
+            alert('Your saved vehicles have been cleared.');
+            updateClearVehiclesLinkVisibility(); // Hide the link itself
+            // Optionally, dispatch an event that other scripts can listen to, to update their state
+            document.dispatchEvent(new CustomEvent('userSavedVehiclesChanged')); // Dispatch event
+            // Reload or redirect if necessary, or let other components handle the event.
+            // window.location.reload(); // Uncomment if a page reload is desired
+          } catch (e) {
+            console.error('Error clearing saved vehicles:', e);
+            alert('There was an error trying to clear your saved vehicles.');
+          }
+        }
+      });
+
+      // Initial check
+      updateClearVehiclesLinkVisibility();
+
+      // Re-check visibility if user navigates with back/forward buttons
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted) { // Check if the page was loaded from cache
+          updateClearVehiclesLinkVisibility();
+        }
+      });
+
+      // Custom event listener to update visibility if other parts of the app modify the saved vehicles
+      document.addEventListener('userSavedVehiclesChanged', function() {
+          updateClearVehiclesLinkVisibility();
+          populateMyVehicleDropdown(); // Also repopulate dropdown
+      });
+
+      // Initial calls
+      updateClearVehiclesLinkVisibility();
+      populateMyVehicleDropdown();
+
+    } else {
+      if (!clearVehiclesContainer) console.log('Header Script: Clear vehicles container not found.');
+      if (!clearVehiclesLink) console.log('Header Script: Clear vehicles link not found.');
+    }
+
+    if (myVehicleSelect) {
+      myVehicleSelect.addEventListener('change', (event) => {
+        const selectedId = event.target.value;
+        if (selectedId) {
+          localStorage.setItem(ACTIVE_VEHICLE_ID_STORAGE_KEY, selectedId);
+          console.log('Active vehicle changed by dropdown to:', selectedId);
+          // Dispatch event so other components (like product-fitment-status) can react
+          try {
+            const savedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+            const savedVehicles = JSON.parse(savedVehiclesString || '[]');
+            const activeVehicle = savedVehicles.find(v => String(v.id) === selectedId);
+            if (activeVehicle) {
+                document.dispatchEvent(new CustomEvent('activeVehicleChanged', { detail: { vehicle: activeVehicle } }));
+            }
+          } catch(e) { console.error('Error finding active vehicle detail for event dispatch', e); }
+        } else {
+          // This case implies a "-- Select Vehicle --" or empty option was chosen.
+          // Depending on desired behavior, could remove activeVehicleId or do nothing.
+          // For now, an empty/non-vehicle option shouldn't be selectable if not explicitly added.
+          // If it is, then clearing active ID might be appropriate:
+          // localStorage.removeItem(ACTIVE_VEHICLE_ID_STORAGE_KEY);
+          // document.dispatchEvent(new CustomEvent('activeVehicleChanged', { detail: { vehicle: null } }));
+        }
+      });
+    } else {
+        if (!myVehicleDropdownContainer) console.log('Header Script: My Vehicle dropdown container not found.');
+        if (!myVehicleSelect) console.log('Header Script: My Vehicle select element not found.');
+    }
+  });
+</script>

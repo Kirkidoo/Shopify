@@ -1,7 +1,14 @@
+const SAVED_VEHICLES_STORAGE_KEY = 'userSavedVehicles';
+const ACTIVE_VEHICLE_ID_STORAGE_KEY = 'activeVehicleId';
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[FitmentStatus] DOMContentLoaded');
   const fitmentStatusContainers = document.querySelectorAll('.product-fitment-status-container');
   console.log(`[FitmentStatus] Found ${fitmentStatusContainers.length} container(s).`);
+
+  // Moved displayMessage outside forEach to define it once, but it needs sectionId and placeholder.
+  // Let's define it inside forEach or pass placeholder and sectionId to it.
+  // For now, keeping it inside forEach but adapting its signature.
 
   fitmentStatusContainers.forEach((container, index) => {
     const sectionId = container.dataset.sectionId || `block-${index}`; // Fallback ID for logging if sectionId is missing
@@ -29,19 +36,96 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`[FitmentStatus ${sectionId}] Message - No Vehicle:`, sectionElement.dataset.noVehicleSelectedMessage || 'Using default');
     console.log(`[FitmentStatus ${sectionId}] Message - API Error:`, sectionElement.dataset.apiErrorMessage || 'Using default');
 
-    const displayMessage = (message, type = 'info') => {
-      console.log(`[FitmentStatus ${sectionId}] Displaying message: "${message}", type: ${type}`);
-      if (placeholder) {
-        placeholder.textContent = message;
-        placeholder.className = `fitment-status-message type-${type}`;
+    // Adapted displayMessage to take placeholderElem and currentSectionId
+    const displayMessage = (message, type = 'info', placeholderElem, currentSectionId) => {
+      // Use currentSectionId for logging, not the one from the outer scope if it differs (though unlikely here)
+      console.log(`[FitmentStatus ${currentSectionId || sectionId}] Displaying message: "${message}", type: ${type}`);
+      if (placeholderElem) {
+        placeholderElem.textContent = message;
+        placeholderElem.className = `fitment-status-message type-${type}`;
       } else {
-        console.error(`[FitmentStatus ${sectionId}] Placeholder element not found!`);
-        container.innerHTML = `<p class="fitment-status-message type-${type}">${message}</p>`;
+        console.error(`[FitmentStatus ${currentSectionId || sectionId}] Placeholder element not found! Attempting to write to container.`);
+        // Fallback: find container by sectionId if possible, or use the initial 'container'
+        const targetContainer = document.querySelector(`[data-section-id="${currentSectionId}"]`) || container;
+        if (targetContainer) {
+            targetContainer.innerHTML = `<p class="fitment-status-message type-${type}">${message}</p>`;
+        } else {
+            console.error(`[FitmentStatus ${currentSectionId || sectionId}] Target container also not found.`);
+        }
+      }
+    };
+
+    // Define checkFitmentForVehicle function
+    const checkFitmentForVehicle = async (vehicle, currentProductSku, currentApiToken, currentApiBaseUrl, currentFitsMessage, currentDoesNotFitMessage, currentApiErrorMessage, currentNoVehicleSelectedMessage, placeholderEl, currentCheckSectionId) => {
+      if (!vehicle || !vehicle.type || !vehicle.make || !vehicle.year || !vehicle.model || !vehicle.category) {
+        console.warn(`[FitmentStatus ${currentCheckSectionId}] Provided vehicle data is incomplete for fitment check.`, vehicle);
+        displayMessage(currentNoVehicleSelectedMessage, 'no-vehicle', placeholderEl, currentCheckSectionId);
+        return;
+      }
+
+      const vehicleName = vehicle.name || `${vehicle.year} ${vehicle.make} ${vehicle.model}`; // Use pre-generated name or construct
+      console.log(`[FitmentStatus ${currentCheckSectionId}] Checking fitment for: ${vehicleName}, SKU: ${currentProductSku}`);
+
+      const apiUrl = new URL(`${currentApiBaseUrl.replace(/\/$/, '')}/fitment/getFitmentProducts`);
+      apiUrl.searchParams.append('make', vehicle.make);
+      apiUrl.searchParams.append('year', vehicle.year);
+      apiUrl.searchParams.append('model', vehicle.model);
+      apiUrl.searchParams.append('category', vehicle.category);
+      if (vehicle.subCategory) {
+        apiUrl.searchParams.append('subCategory', vehicle.subCategory);
+      }
+      apiUrl.searchParams.append('itemList', currentProductSku); // Ensure productSku is in scope or passed
+
+      console.log(`[FitmentStatus ${currentCheckSectionId}] Constructed API URL:`, apiUrl.toString());
+      // Show loading indicator in placeholder - optional
+      displayMessage(`Checking fitment for ${vehicleName}...`, 'loading', placeholderEl, currentCheckSectionId);
+
+
+      try {
+        const response = await fetch(apiUrl.toString(), {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${currentApiToken}`, // Ensure apiToken is in scope or passed
+            'Accept': 'application/json'
+          }
+        });
+
+        console.log(`[FitmentStatus ${currentCheckSectionId}] API response status:`, response.status);
+        if (!response.ok) {
+          const responseText = await response.text();
+          const errorMsg = `API request failed with status ${response.status}. Response: ${responseText}`;
+          console.error(`[FitmentStatus ${currentCheckSectionId}] ${errorMsg}`);
+          throw new Error(errorMsg);
+        }
+
+        const data = await response.json();
+        console.log(`[FitmentStatus ${currentCheckSectionId}] API response data:`, data);
+
+        if (data && data.data && Array.isArray(data.data.fitmentProducts)) {
+          const productIsFit = data.data.fitmentProducts.some(
+            fitProduct => fitProduct.itemNumber === currentProductSku && fitProduct.type === vehicle.type // Compare against the current vehicle's type
+          );
+          console.log(`[FitmentStatus ${currentCheckSectionId}] Product is fit for ${vehicleName}:`, productIsFit);
+          if (productIsFit) {
+            displayMessage(currentFitsMessage.replace('{vehicle_name}', vehicleName), 'fits', placeholderEl, currentCheckSectionId);
+          } else {
+            displayMessage(currentDoesNotFitMessage.replace('{vehicle_name}', vehicleName), 'does-not-fit', placeholderEl, currentCheckSectionId);
+          }
+        } else {
+          // This case includes 404s that might return JSON like {status: 404, message: "..."} but are !response.ok
+          // And also cases where response is ok but data structure is unexpected
+          console.warn(`[FitmentStatus ${currentCheckSectionId}] Unexpected API response structure or no fitment data. Data:`, data);
+          displayMessage(currentDoesNotFitMessage.replace('{vehicle_name}', vehicleName), 'does-not-fit', placeholderEl, currentCheckSectionId); // Assume does not fit for unexpected
+        }
+      } catch (error) {
+        console.error(`[FitmentStatus ${currentCheckSectionId}] API call failed or error processing response for ${vehicleName}.`, error);
+        displayMessage(currentApiErrorMessage, 'error', placeholderEl, currentCheckSectionId);
       }
     };
 
     if (!apiToken || !apiBaseUrl) {
       console.error(`[FitmentStatus ${sectionId}] API token or base URL is missing. Cannot proceed.`);
+      // displayMessage("API configuration missing.", "error", placeholder, sectionId); // Optionally show error
       if (placeholder) placeholder.style.display = 'none';
       return;
     }
@@ -52,86 +136,203 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const lastSelectedVehicleString = localStorage.getItem('lastSelectedVehicle');
-    console.log(`[FitmentStatus ${sectionId}] Raw lastSelectedVehicle from localStorage:`, lastSelectedVehicleString);
+    // --- Start of new logic for handling saved vehicles list ---
+    const savedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+    console.log(`[FitmentStatus ${sectionId}] Raw savedVehiclesString from localStorage:`, savedVehiclesString);
 
-    if (!lastSelectedVehicleString) {
-      console.log(`[FitmentStatus ${sectionId}] No vehicle selected. Hiding container.`);
-      container.style.display = 'none'; // Hide the entire container
+    if (!savedVehiclesString) {
+      console.log(`[FitmentStatus ${sectionId}] No saved vehicles found in localStorage. Displaying no vehicle message or hiding.`);
+      // Display no vehicle selected message, or hide container if placeholder isn't suitable for this message.
+      // For now, assume product-finder is primary way to add vehicles, so this message is appropriate.
+      displayMessage(noVehicleSelectedMessage, 'no-vehicle', placeholder, sectionId);
+      // container.style.display = 'none'; // Alternative: hide if no selection is ever expected
       return;
     }
 
-    let lastSelectedVehicle;
+    let savedVehicles = [];
     try {
-      lastSelectedVehicle = JSON.parse(lastSelectedVehicleString);
-      console.log(`[FitmentStatus ${sectionId}] Parsed lastSelectedVehicle:`, lastSelectedVehicle);
+      savedVehicles = JSON.parse(savedVehiclesString);
+      if (!Array.isArray(savedVehicles)) {
+        console.warn(`[FitmentStatus ${sectionId}] Parsed savedVehicles is not an array, treating as empty. Value:`, savedVehicles);
+        savedVehicles = [];
+      }
+      console.log(`[FitmentStatus ${sectionId}] Parsed savedVehicles:`, savedVehicles);
     } catch (e) {
-      console.error(`[FitmentStatus ${sectionId}] Error parsing lastSelectedVehicle from localStorage.`, e);
-      displayMessage(apiErrorMessage, 'error');
+      console.error(`[FitmentStatus ${sectionId}] Error parsing savedVehicles from localStorage.`, e);
+      displayMessage(apiErrorMessage, 'error', placeholder, sectionId); // Show API error as it's a data issue
       return;
     }
 
-    if (!lastSelectedVehicle || !lastSelectedVehicle.type || !lastSelectedVehicle.make || !lastSelectedVehicle.year || !lastSelectedVehicle.model || !lastSelectedVehicle.category) {
-      console.warn(`[FitmentStatus ${sectionId}] Last selected vehicle data from localStorage is incomplete.`, lastSelectedVehicle);
-      displayMessage(noVehicleSelectedMessage, 'no-vehicle');
+    if (savedVehicles.length === 0) {
+      console.log(`[FitmentStatus ${sectionId}] No vehicles in the saved list. Displaying no vehicle message.`);
+      displayMessage(noVehicleSelectedMessage, 'no-vehicle', placeholder, sectionId);
       return;
     }
-    
-    const vehicleName = `${lastSelectedVehicle.year} ${lastSelectedVehicle.make} ${lastSelectedVehicle.model}`;
-    console.log(`[FitmentStatus ${sectionId}] Constructed vehicleName:`, vehicleName);
 
-    const apiUrl = new URL(`${apiBaseUrl.replace(/\/$/, '')}/fitment/getFitmentProducts`);
-    apiUrl.searchParams.append('make', lastSelectedVehicle.make);
-    apiUrl.searchParams.append('year', lastSelectedVehicle.year);
-    apiUrl.searchParams.append('model', lastSelectedVehicle.model);
-    apiUrl.searchParams.append('category', lastSelectedVehicle.category);
-    if (lastSelectedVehicle.subCategory) {
-      apiUrl.searchParams.append('subCategory', lastSelectedVehicle.subCategory);
-    }
-    apiUrl.searchParams.append('itemList', productSku);
-    console.log(`[FitmentStatus ${sectionId}] Constructed API URL:`, apiUrl.toString());
+    // At this point, we have productSku, apiToken, apiBaseUrl, and a list of one or more vehicles.
+    // The messages (fitsMessage, etc.) are also available in the outer scope.
 
-    fetch(apiUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiToken}`,
-        'Accept': 'application/json'
-      }
-    })
-    .then(response => {
-      console.log(`[FitmentStatus ${sectionId}] API response status:`, response.status);
-      if (!response.ok) {
-        return response.text().then(text => { // Get text for more detailed error
-          const errorMsg = `API request failed with status ${response.status}. Response: ${text}`;
-          console.error(`[FitmentStatus ${sectionId}] ${errorMsg}`);
-          throw new Error(errorMsg); 
-        });
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log(`[FitmentStatus ${sectionId}] API response data:`, data);
-      if (data && data.data && Array.isArray(data.data.fitmentProducts)) {
-        const productIsFit = data.data.fitmentProducts.some(
-          fitProduct => fitProduct.itemNumber === productSku && fitProduct.type === lastSelectedVehicle.type
-        );
-        console.log(`[FitmentStatus ${sectionId}] Product is fit:`, productIsFit);
-        if (productIsFit) {
-          displayMessage(fitsMessage.replace('{vehicle_name}', vehicleName), 'fits');
-        } else {
-          displayMessage(doesNotFitMessage.replace('{vehicle_name}', vehicleName), 'does-not-fit');
-        }
-      } else if (data && data.status === 404) { // This condition might be redundant if !response.ok handles 404s
-        console.warn(`[FitmentStatus ${sectionId}] API returned 404 (interpreted as no fit). SKU ${productSku}, Vehicle: ${vehicleName}. Raw Response:`, data);
-        displayMessage(doesNotFitMessage.replace('{vehicle_name}', vehicleName), 'does-not-fit');
+    let vehicleToUseForFitment = null;
+    let preSelectedByHeader = false;
+    const activeVehicleIdFromHeader = localStorage.getItem(ACTIVE_VEHICLE_ID_STORAGE_KEY);
+
+    if (activeVehicleIdFromHeader) {
+      vehicleToUseForFitment = savedVehicles.find(v => String(v.id) === activeVehicleIdFromHeader);
+      if (vehicleToUseForFitment) {
+        preSelectedByHeader = true;
+        console.log(`[FitmentStatus ${sectionId}] Active vehicle from header found:`, vehicleToUseForFitment.name);
       } else {
-        console.warn(`[FitmentStatus ${sectionId}] Unexpected API response structure.`, data);
-        displayMessage(apiErrorMessage, 'error');
+        console.log(`[FitmentStatus ${sectionId}] Active vehicle ID ${activeVehicleIdFromHeader} from header not found in saved list, or list is empty.`);
       }
-    })
-    .catch(error => {
-      console.error(`[FitmentStatus ${sectionId}] API call failed or error processing response.`, error);
-      displayMessage(apiErrorMessage, 'error');
+    }
+
+    if (!vehicleToUseForFitment && savedVehicles.length === 1) {
+      vehicleToUseForFitment = savedVehicles[0];
+      console.log(`[FitmentStatus ${sectionId}] Single vehicle found, using it:`, vehicleToUseForFitment.name);
+    }
+
+    // Clear any existing product-page-specific dropdown if a vehicle is pre-selected or if there's only one.
+    if (vehicleToUseForFitment) {
+        const existingProductPageDropdown = container.querySelector('.fitment-vehicle-selector-area');
+        if (existingProductPageDropdown) existingProductPageDropdown.remove();
+
+        checkFitmentForVehicle(vehicleToUseForFitment, productSku, apiToken, apiBaseUrl, fitsMessage, doesNotFitMessage, apiErrorMessage, noVehicleSelectedMessage, placeholder, sectionId);
+    } else if (savedVehicles.length > 1) { // No vehicle pre-selected by header, and more than one saved vehicle
+        console.log(`[FitmentStatus ${sectionId}] Multiple vehicles (${savedVehicles.length}) found, no active one from header. Creating product-page select dropdown.`);
+
+        const vehicleSelectorContainer = document.createElement('div');
+        vehicleSelectorContainer.className = 'fitment-vehicle-selector-area';
+
+        const label = document.createElement('label');
+        label.textContent = 'Check fitment for: ';
+        label.htmlFor = `vehicle-select-${sectionId}`;
+
+        const vehicleSelectDropdown = document.createElement('select');
+        vehicleSelectDropdown.id = `vehicle-select-${sectionId}`;
+        vehicleSelectDropdown.className = 'fitment-vehicle-select'; // For styling
+
+        const defaultOption = document.createElement('option');
+        defaultOption.value = "";
+        defaultOption.textContent = "-- Select Your Vehicle --";
+        vehicleSelectDropdown.appendChild(defaultOption);
+
+        savedVehicles.forEach(vehicle => {
+          if (vehicle && vehicle.id && vehicle.name) { // Ensure vehicle object is valid
+            const option = document.createElement('option');
+            option.value = String(vehicle.id);
+            option.textContent = vehicle.name;
+            vehicleSelectDropdown.appendChild(option);
+          } else {
+            console.warn(`[FitmentStatus ${sectionId}] Skipping invalid vehicle in list:`, vehicle);
+          }
+        });
+
+        vehicleSelectorContainer.appendChild(label);
+        vehicleSelectorContainer.appendChild(vehicleSelectDropdown);
+
+        if (placeholder && placeholder.parentNode) {
+          placeholder.parentNode.insertBefore(vehicleSelectorContainer, placeholder);
+        } else {
+          container.appendChild(vehicleSelectorContainer);
+        }
+
+        displayMessage("Select a vehicle above to check fitment.", 'info', placeholder, sectionId);
+
+        vehicleSelectDropdown.addEventListener('change', (event) => {
+          const selectedVehicleId = event.target.value;
+          if (selectedVehicleId) {
+            const vehicleObject = savedVehicles.find(v => String(v.id) === selectedVehicleId);
+            if (vehicleObject) {
+              // When product-page dropdown changes, we don't need to update global active ID
+              checkFitmentForVehicle(vehicleObject, productSku, apiToken, apiBaseUrl, fitsMessage, doesNotFitMessage, apiErrorMessage, noVehicleSelectedMessage, placeholder, sectionId);
+            } else {
+              console.error(`[FitmentStatus ${sectionId}] Selected vehicle ID ${selectedVehicleId} not found in savedVehicles list.`);
+              displayMessage(apiErrorMessage, 'error', placeholder, sectionId);
+            }
+          } else {
+            displayMessage("Select a vehicle above to check fitment.", 'info', placeholder, sectionId);
+          }
+        });
+    } else {
+        // This case should ideally be covered by earlier checks (no savedVehiclesString or savedVehicles.length === 0)
+        // but as a fallback, if somehow we reach here with no vehicle to use and not multiple vehicles.
+        console.log(`[FitmentStatus ${sectionId}] No vehicle to use for fitment and not multiple vehicles to choose from. Displaying no vehicle message.`);
+        displayMessage(noVehicleSelectedMessage, 'no-vehicle', placeholder, sectionId);
+    }
+    // --- End of new logic ---
+
+    document.addEventListener('activeVehicleChanged', (event) => {
+      if (!document.body.contains(container)) return; // Container no longer in DOM
+
+      const currentProductSku = container.dataset.productSku; // Re-fetch from data attribute
+      const currentApiToken = container.dataset.apiToken;
+      const currentApiBaseUrl = container.dataset.apiBaseUrl;
+      const currentPlaceholder = container.querySelector('.fitment-status-placeholder');
+      const currentFitsMessage = container.dataset.fitsMessage || "This product fits your {vehicle_name}.";
+      const currentDoesNotFitMessage = container.dataset.doesNotFitMessage || "This product does not fit your {vehicle_name}.";
+      const currentApiErrorMessage = container.dataset.apiErrorMessage || "Could not retrieve fitment information. Please try again later.";
+      const currentNoVehicleSelectedMessage = container.dataset.noVehicleSelectedMessage || "Select your vehicle using the Product Finder to check fitment.";
+
+      if (event.detail && event.detail.vehicle) {
+        const newActiveVehicle = event.detail.vehicle;
+        console.log(`[FitmentStatus ${sectionId}] Detected active vehicle change from header:`, newActiveVehicle.name);
+
+        const existingProductPageDropdown = container.querySelector('.fitment-vehicle-selector-area');
+        if (existingProductPageDropdown) existingProductPageDropdown.remove();
+
+        if (currentProductSku && currentApiToken && currentApiBaseUrl && currentPlaceholder) {
+             checkFitmentForVehicle(
+                newActiveVehicle,
+                currentProductSku,
+                currentApiToken,
+                currentApiBaseUrl,
+                currentFitsMessage,
+                currentDoesNotFitMessage,
+                currentApiErrorMessage,
+                currentNoVehicleSelectedMessage,
+                currentPlaceholder,
+                sectionId
+            );
+        } else {
+            console.warn(`[FitmentStatus ${sectionId}] Cannot re-check fitment on activeVehicleChanged due to missing current data attributes or placeholder.`);
+        }
+      } else if (event.detail && event.detail.vehicle === null) {
+          console.log(`[FitmentStatus ${sectionId}] Active vehicle was cleared by header.`);
+          const existingProductPageDropdown = container.querySelector('.fitment-vehicle-selector-area');
+          if (existingProductPageDropdown) existingProductPageDropdown.remove(); // Remove product page dropdown if active is cleared
+
+          // Re-evaluate UI: if multiple vehicles still exist, show product-page dropdown, else "no vehicle"
+          const currentSavedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+          let currentSavedVehicles = [];
+          if (currentSavedVehiclesString) {
+              try { currentSavedVehicles = JSON.parse(currentSavedVehiclesString);
+                    if(!Array.isArray(currentSavedVehicles)) currentSavedVehicles = [];
+              } catch(e) { /* ignore */ }
+          }
+
+          if (currentSavedVehicles.length > 1) {
+            // Re-invoke the logic to build the product-page dropdown
+            // This is a bit repetitive, could be refactored into a function `initializeContainerUI(container, savedVehicles)`
+            // For now, direct call to the existing logic block (which needs to be available or duplicated)
+            // This part is tricky because the original savedVehicles variable is out of scope.
+            // Simplification: just show "no vehicle" and let page reload/navigation handle full re-init.
+             displayMessage(currentNoVehicleSelectedMessage, 'no-vehicle', currentPlaceholder, sectionId);
+             console.warn(`[FitmentStatus ${sectionId}] Active vehicle cleared. Product page dropdown logic would need full savedVehicles list to re-render if needed. For now, showing 'no vehicle'.`);
+          } else if (currentSavedVehicles.length === 1) {
+            // If one vehicle remains, it should have become active. This event (vehicle: null) might be followed by (vehicle: newActive).
+            // Or, if product-finder.js set the last remaining one active, this component might not even see vehicle:null.
+            // For robustness, if there is one vehicle, check it.
+             checkFitmentForVehicle(
+                currentSavedVehicles[0],
+                currentProductSku, currentApiToken, currentApiBaseUrl,
+                currentFitsMessage, currentDoesNotFitMessage, currentApiErrorMessage, currentNoVehicleSelectedMessage,
+                currentPlaceholder, sectionId
+            );
+          }
+          else {
+            displayMessage(currentNoVehicleSelectedMessage, 'no-vehicle', currentPlaceholder, sectionId);
+          }
+      }
     });
   });
 });

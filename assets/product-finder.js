@@ -16,7 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // const CACHE_EXPIRY_MS = SHORT_CACHE_EXPIRY_MS; // Replaced by SHORT_CACHE_EXPIRY_MS
   const DESKTOP_BREAKPOINT = 769;
   const STORAGE_KEY_PREFIX = 'fitmentToggleState_'; // For section collapse state
-  const LAST_SELECTED_VEHICLE_STORAGE_KEY = 'lastSelectedVehicle'; // For remembering last vehicle
+  const SAVED_VEHICLES_STORAGE_KEY = 'userSavedVehicles'; // For remembering user's saved vehicles
+  const ACTIVE_VEHICLE_ID_STORAGE_KEY = 'activeVehicleId'; // For storing the ID of the active vehicle
   const SKELETON_CARD_COUNT = 6; // Number of skeleton cards to show while loading products
 
 
@@ -114,6 +115,30 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleButton: section.querySelector('.fitment-toggle-button'),
         contentWrapper: section.querySelector('.fitment-content-wrapper'),
     };
+
+    // Create "Save This Vehicle" button
+    const saveVehicleButton = document.createElement('button');
+    saveVehicleButton.id = `fitment-save-vehicle-${sectionId}`;
+    saveVehicleButton.textContent = 'Save This Vehicle';
+    saveVehicleButton.className = 'button fitment-save-vehicle-button'; // Added custom class
+    saveVehicleButton.type = 'button';
+    saveVehicleButton.style.display = 'none'; // Initially hidden
+
+    // Add to elements object
+    elements.saveVehicleButton = saveVehicleButton;
+
+    // Insert the button into the DOM - after the findPartsButton
+    if (elements.findPartsButton && elements.findPartsButton.parentNode) {
+        elements.findPartsButton.parentNode.insertBefore(saveVehicleButton, elements.findPartsButton.nextSibling);
+        // Add some margin if they are inline-block or similar
+        if (elements.findPartsButton.nextSibling === saveVehicleButton) { // Check if successfully inserted
+             saveVehicleButton.style.marginLeft = '10px'; // Example margin
+        }
+    } else if (elements.contentWrapper) { // Fallback: append to contentWrapper if button group not structured as expected
+        elements.contentWrapper.appendChild(saveVehicleButton);
+        saveVehicleButton.style.marginTop = '10px'; // Example margin
+    }
+
 
     let categoryChoicesInstance = null;
     let currentCategoryOptions = [];
@@ -386,6 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectElement) resetSelect(selectElement, placeholder);
       }
       if(elements.findPartsButton) elements.findPartsButton.disabled = true;
+      if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none'; // Hide save button
       if (['type', 'category', 'make', 'year'].includes(currentLevel)) {
         if(elements.resultsContainer) elements.resultsContainer.innerHTML = '<p>Please select your vehicle details above to find compatible parts.</p>';
         clearError(sectionId);
@@ -402,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(elements.yearSelect) elements.yearSelect.disabled = true;
         if(elements.modelSelect) elements.modelSelect.disabled = true;
         if(elements.findPartsButton) elements.findPartsButton.disabled = true;
+        if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none'; // Hide save button
     };
 
     const resetAllSelectorsAndResults = () => {
@@ -410,11 +437,16 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
           const localSt = getStorage('local');
           if (localSt) {
-            localSt.removeItem(LAST_SELECTED_VEHICLE_STORAGE_KEY); // This is fine, it's not using CACHE_PREFIX
-            console.log(`Cleared last selected vehicle from localStorage.`);
+            localSt.removeItem(SAVED_VEHICLES_STORAGE_KEY);
+            localSt.removeItem(ACTIVE_VEHICLE_ID_STORAGE_KEY); // Also remove active vehicle ID
+            console.log(`Cleared saved vehicles list and active vehicle ID from localStorage.`);
+            document.dispatchEvent(new CustomEvent('userSavedVehiclesChanged')); // Dispatch event
+            // Clean up the old key as well
+            localSt.removeItem('lastSelectedVehicle');
+            console.log(`Ensured old 'lastSelectedVehicle' key is also removed from localStorage.`);
           }
       } catch (e) {
-          console.warn(`Could not clear last selected vehicle from localStorage:`, e);
+        console.warn(`Could not clear saved vehicles and active ID from localStorage:`, e);
       }
 
       // Reset type selector and trigger re-initialization, which will load types from localStorage or API.
@@ -427,6 +459,11 @@ document.addEventListener('DOMContentLoaded', () => {
       resetSelect(elements.modelSelect, PLACEHOLDERS.MODEL, true);
 
       if(elements.findPartsButton) elements.findPartsButton.disabled = true;
+      if(elements.saveVehicleButton) {
+        elements.saveVehicleButton.style.display = 'none'; // Hide save button
+        elements.saveVehicleButton.textContent = 'Save This Vehicle'; // Reset text
+        // elements.saveVehicleButton.disabled = false; // Ensure enabled, if previously disabled on save
+      }
       if(elements.resultsContainer) elements.resultsContainer.innerHTML = '<p>Please select your vehicle details above to find compatible parts.</p>';
       clearError(sectionId); // Clear any existing error messages
 
@@ -447,8 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const saveSelectedVehicle = () => {
-        // Saves the currently selected vehicle details to localStorage.
-        // This allows the widget to remember the user's last selection across sessions/page loads if desired elsewhere.
+        // Saves the currently selected vehicle details to a list in localStorage.
         const selectedType = elements.typeSelect?.value;
         const selectedCombinedCategory = elements.categorySelect?.value;
         const selectedMake = elements.makeSelect?.value;
@@ -463,7 +499,9 @@ document.addEventListener('DOMContentLoaded', () => {
                  if (parts.length > 1) { subCategory = parts.slice(1).join(' - ').trim(); }
             }
 
-            const selectedVehicle = {
+            const newVehicle = {
+                id: Date.now(), // Unique ID
+                name: `${selectedMake} ${selectedModel} ${selectedYear}`, // Placeholder name
                 type: selectedType,
                 category: category,
                 subCategory: subCategory,
@@ -471,19 +509,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 year: selectedYear,
                 model: selectedModel
             };
+
             try {
-                localStorage.setItem(LAST_SELECTED_VEHICLE_STORAGE_KEY, JSON.stringify(selectedVehicle));
-                console.log('Saved selected vehicle to localStorage:', selectedVehicle);
+                const storage = getStorage('local');
+                if (!storage) {
+                    console.warn('localStorage is not available. Cannot save vehicle list.');
+                    return;
+                }
+
+                let savedVehicles = [];
+                const existingVehiclesStr = storage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+                if (existingVehiclesStr) {
+                    try {
+                        savedVehicles = JSON.parse(existingVehiclesStr);
+                        if (!Array.isArray(savedVehicles)) { // Ensure it's an array
+                            console.warn('Existing saved vehicles data is not an array, resetting.');
+                            savedVehicles = [];
+                        }
+                    } catch (parseError) {
+                        console.error('Error parsing saved vehicles from localStorage, resetting list:', parseError);
+                        savedVehicles = [];
+                    }
+                }
+
+                // Check for duplicates (based on type, make, model, year)
+                const isDuplicate = savedVehicles.some(vehicle =>
+                    vehicle.type === newVehicle.type &&
+                    vehicle.make === newVehicle.make &&
+                    vehicle.model === newVehicle.model &&
+                    vehicle.year === newVehicle.year &&
+                    vehicle.category === newVehicle.category && // Also check category for stricter duplication
+                    vehicle.subCategory === newVehicle.subCategory
+                );
+
+                if (!isDuplicate) {
+                    savedVehicles.push(newVehicle);
+                    storage.setItem(SAVED_VEHICLES_STORAGE_KEY, JSON.stringify(savedVehicles));
+                    console.log('Updated saved vehicles list in localStorage:', savedVehicles);
+                    document.dispatchEvent(new CustomEvent('userSavedVehiclesChanged')); // Dispatch event
+
+                    // Set active vehicle if needed
+                    const currentActiveId = storage.getItem(ACTIVE_VEHICLE_ID_STORAGE_KEY);
+                    const newlySavedVehicleId = String(newVehicle.id); // Ensure it's a string if IDs are stored as strings
+
+                    if (!currentActiveId || savedVehicles.length === 1) {
+                      storage.setItem(ACTIVE_VEHICLE_ID_STORAGE_KEY, newlySavedVehicleId);
+                      console.log('Set active vehicle ID to:', newlySavedVehicleId);
+                      // Note: Consider if 'activeVehicleChanged' event is needed here or if 'userSavedVehiclesChanged' is enough.
+                      // For now, the header dropdown will likely re-evaluate active on 'userSavedVehiclesChanged'.
+                    }
+                } else {
+                    console.log('Vehicle already exists in the saved list, not adding duplicate:', newVehicle);
+                    // Even if it's a duplicate, the list state (though unchanged) is confirmed.
+                    // If the existing duplicate *wasn't* active but should become active now, logic would be needed.
+                    // However, current requirement is to set active only if no active OR if it's the first saved.
+                    // If it's a duplicate, it's not the "first saved" in this specific action.
+                    // And if an active one exists, it won't be overridden by a duplicate.
+                }
             } catch (e) {
-                console.warn('Could not save selected vehicle to localStorage:', e);
+                console.warn('Could not update saved vehicles list or active vehicle ID in localStorage:', e);
             }
         } else {
-             try {
-                 localStorage.removeItem(LAST_SELECTED_VEHICLE_STORAGE_KEY);
-                 console.log('Cleared last selected vehicle from localStorage (incomplete selection).');
-             } catch (e) {
-                  console.warn('Could not clear last selected vehicle from localStorage:', e);
-             }
+            // No change in behavior if selection is incomplete - we don't clear the list,
+            // as the user might be in the process of selecting.
+            // The old logic cleared the single selected vehicle, which is not applicable to a list.
+            console.log('Selection is incomplete, not attempting to save vehicle to list.');
         }
     };
 
@@ -1116,36 +1206,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
     elements.typeSelect?.addEventListener('change', (event) => {
       resetSubsequentDropdowns('type');
-      saveSelectedVehicle();
+      // saveSelectedVehicle(); // Removed: Save only on explicit action
       if (event.target.value) loadCategoriesData();
+      // Ensure save button is hidden if selection becomes incomplete
+      if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none';
     });
     elements.categorySelect?.addEventListener('change', (event) => {
       resetSubsequentDropdowns('category');
-      saveSelectedVehicle();
+      // saveSelectedVehicle(); // Removed: Save only on explicit action
       if (event.target.value) loadMakesData();
+      // Ensure save button is hidden if selection becomes incomplete
+      if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none';
     });
     elements.makeSelect?.addEventListener('change', (event) => {
       resetSubsequentDropdowns('make');
-      saveSelectedVehicle();
+      // saveSelectedVehicle(); // Removed: Save only on explicit action
       if (event.target.value) loadYearsData();
+      // Ensure save button is hidden if selection becomes incomplete
+      if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none';
     });
     elements.yearSelect?.addEventListener('change', (event) => {
       resetSubsequentDropdowns('year');
-      saveSelectedVehicle();
+      // saveSelectedVehicle(); // Removed: Save only on explicit action
       if (event.target.value) loadModelsData();
+      // Ensure save button is hidden if selection becomes incomplete
+      if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none';
     });
     elements.modelSelect?.addEventListener('change', (event) => {
       resetSubsequentDropdowns('model');
-      saveSelectedVehicle();
-      // Enable find parts button if all selections are made
+      // saveSelectedVehicle(); // Removed: Save only on explicit action
+      // Enable find parts button and save vehicle button if all selections are made
       if (event.target.value && elements.typeSelect?.value && elements.categorySelect?.value && elements.makeSelect?.value && elements.yearSelect?.value) {
         if(elements.findPartsButton) elements.findPartsButton.disabled = false;
+        if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'inline-block';
       } else {
         if(elements.findPartsButton) elements.findPartsButton.disabled = true;
+        if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none';
       }
     });
-    elements.findPartsButton?.addEventListener('click', performSearch);
+
+    elements.findPartsButton?.addEventListener('click', performSearch); // performSearch already calls saveSelectedVehicle
     elements.resetButton?.addEventListener('click', resetAllSelectorsAndResults);
+
+    // Event listener for the new "Save This Vehicle" button
+    elements.saveVehicleButton?.addEventListener('click', () => {
+        saveSelectedVehicle(); // Call the existing function to save the vehicle
+        if (elements.saveVehicleButton) {
+            elements.saveVehicleButton.textContent = 'Vehicle Saved!';
+            // elements.saveVehicleButton.disabled = true; // Optionally disable
+            setTimeout(() => {
+                if (elements.saveVehicleButton) {
+                    elements.saveVehicleButton.textContent = 'Save This Vehicle';
+                    // elements.saveVehicleButton.disabled = false; // Optionally re-enable
+                }
+            }, 3000); // Reset text after 3 seconds
+        }
+    });
 
 
     // --- Toggle Button Logic ---
@@ -1176,7 +1292,98 @@ document.addEventListener('DOMContentLoaded', () => {
         setInitialToggleState();
     }
 
-    // --- Initialization ---
+    // --- Prefill and Initialization ---
+
+    async function prefillSelectorsWithVehicle(vehicle, elements, sectionId, loadFunctions, currentCategoryChoicesInstance) {
+      console.log(`[ProductFinder ${sectionId}] Attempting to prefill with active vehicle:`, vehicle);
+
+      // Helper to set value, dispatch change, and await next load function
+      async function setValueAndLoadNext(selectElement, value, nextLoadFn, selectNameForLog) {
+        if (!selectElement) {
+          console.warn(`[ProductFinder ${sectionId}] Cannot prefill ${selectNameForLog}: select element not found.`);
+          return false;
+        }
+
+        // Wait for options to be available. This is a simplified polling mechanism.
+        // A more robust solution might use MutationObserver or specific events if available from Choices.js/dependent loads.
+        let attempt = 0;
+        const maxAttempts = 20; // Try for up to 2 seconds (20 * 100ms)
+        let optionExists = false;
+
+        while(attempt < maxAttempts) {
+            optionExists = Array.from(selectElement.options).some(opt => opt.value === String(value));
+            if (optionExists) break;
+            // console.log(`[ProductFinder ${sectionId}] Waiting for options in ${selectNameForLog}... Attempt ${attempt + 1}`);
+            await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+            attempt++;
+        }
+
+        if (!optionExists) {
+          console.warn(`[ProductFinder ${sectionId}] Cannot prefill ${selectNameForLog}: value '${String(value)}' not found in options after waiting. Available:`, Array.from(selectElement.options).map(opt => opt.value));
+          return false;
+        }
+
+        selectElement.value = String(value);
+
+        if (selectElement === elements.categorySelect && currentCategoryChoicesInstance) {
+            // Find the label corresponding to the value for Choices.js
+            const selectedOption = Array.from(selectElement.options).find(opt => opt.value === String(value));
+            const label = selectedOption ? selectedOption.textContent : String(value);
+            currentCategoryChoicesInstance.setValue([{ value: String(value), label: label }]);
+        }
+
+        // Dispatch change event *after* Choices.js has been updated, if applicable
+        selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log(`[ProductFinder ${sectionId}] Prefilled ${selectNameForLog} with '${String(value)}'.`);
+
+        if (nextLoadFn) {
+          console.log(`[ProductFinder ${sectionId}] Calling next load function for ${selectNameForLog}.`);
+          try {
+            await nextLoadFn();
+          } catch (error) {
+            console.error(`[ProductFinder ${sectionId}] Error during ${selectNameForLog}'s next load function:`, error);
+            return false;
+          }
+        }
+        return true;
+      }
+
+      // Start prefill sequence
+      if (!(await setValueAndLoadNext(elements.typeSelect, vehicle.type, loadFunctions.loadCategoriesData, 'Type'))) {
+        console.warn(`[ProductFinder ${sectionId}] Prefill failed at Type stage.`); return;
+      }
+
+      let combinedCategoryValue = vehicle.category;
+      if (vehicle.subCategory && vehicle.subCategory.trim() !== '') {
+        combinedCategoryValue += ` - ${vehicle.subCategory.trim()}`;
+      }
+      if (!(await setValueAndLoadNext(elements.categorySelect, combinedCategoryValue, loadFunctions.loadMakesData, 'Category'))) {
+        console.warn(`[ProductFinder ${sectionId}] Prefill failed at Category stage.`); return;
+      }
+
+      if (!(await setValueAndLoadNext(elements.makeSelect, vehicle.make, loadFunctions.loadYearsData, 'Make'))) {
+        console.warn(`[ProductFinder ${sectionId}] Prefill failed at Make stage.`); return;
+      }
+      if (!(await setValueAndLoadNext(elements.yearSelect, String(vehicle.year), loadFunctions.loadModelsData, 'Year'))) {
+        console.warn(`[ProductFinder ${sectionId}] Prefill failed at Year stage.`); return;
+      }
+      // For the last step (Model), there's no 'nextLoadFn'
+      if (!(await setValueAndLoadNext(elements.modelSelect, vehicle.model, null, 'Model'))) {
+        console.warn(`[ProductFinder ${sectionId}] Prefill failed at Model stage.`); return;
+      }
+
+      // After all selections are made and respective 'change' events dispatched:
+      if (elements.findPartsButton && elements.modelSelect.value) {
+          elements.findPartsButton.disabled = false;
+          console.log(`[ProductFinder ${sectionId}] Find Parts button enabled after prefill.`);
+      }
+      if (elements.saveVehicleButton && elements.modelSelect.value) {
+          elements.saveVehicleButton.style.display = 'inline-block';
+          console.log(`[ProductFinder ${sectionId}] Save Vehicle button shown after prefill.`);
+      }
+      console.log(`[ProductFinder ${sectionId}] Successfully prefilled all selectors for vehicle:`, vehicle.name);
+    }
+
     // Extracted type loading logic into its own function for retry purposes
     const loadTypesData = async () => {
       sectionStates[sectionId].currentActionInProgress = loadTypesData;
@@ -1188,6 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
       resetSelect(elements.yearSelect, PLACEHOLDERS.YEAR, true);
       resetSelect(elements.modelSelect, PLACEHOLDERS.MODEL, true);
       if(elements.findPartsButton) elements.findPartsButton.disabled = true;
+      if(elements.saveVehicleButton) elements.saveVehicleButton.style.display = 'none'; // Hide save button during type loading too
 
       const cacheKey = 'types'; // Cache key for vehicle types
       const cachedData = getCache(cacheKey, 'local');
@@ -1233,11 +1441,45 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    const initialize = () => { // Main initialization entry point for the section
-        loadTypesData();
+    const initialize = async () => { // Main initialization entry point for the section
+      try {
+        await loadTypesData(); // This populates the Type dropdown first.
+
+        const activeVehicleId = localStorage.getItem(ACTIVE_VEHICLE_ID_STORAGE_KEY);
+        if (activeVehicleId) {
+          console.log(`[ProductFinder ${sectionId}] Active vehicle ID found on init: ${activeVehicleId}`);
+          const savedVehiclesString = localStorage.getItem(SAVED_VEHICLES_STORAGE_KEY);
+          if (savedVehiclesString) {
+            let savedVehicles = [];
+            try { savedVehicles = JSON.parse(savedVehiclesString); } catch(e){ console.error("Error parsing saved vehicles for prefill", e); }
+
+            if (!Array.isArray(savedVehicles)) savedVehicles = []; // Ensure it's an array
+
+            const vehicleToPrefill = savedVehicles.find(v => String(v.id) === activeVehicleId);
+
+            if (vehicleToPrefill) {
+              const sectionLoadFunctions = { loadCategoriesData, loadMakesData, loadYearsData, loadModelsData };
+              // Pass the current categoryChoicesInstance to the prefill function
+              await prefillSelectorsWithVehicle(vehicleToPrefill, elements, sectionId, sectionLoadFunctions, categoryChoicesInstance);
+            } else {
+              console.log(`[ProductFinder ${sectionId}] Active vehicle ID ${activeVehicleId} not found in saved vehicles list. Clearing stale ID.`);
+              localStorage.removeItem(ACTIVE_VEHICLE_ID_STORAGE_KEY);
+              // No specific UI update needed here, as the selectors will just be in their default state.
+            }
+          } else {
+             console.log(`[ProductFinder ${sectionId}] No saved vehicles string found, cannot prefill even with active ID. Clearing active ID.`);
+             localStorage.removeItem(ACTIVE_VEHICLE_ID_STORAGE_KEY);
+          }
+        } else {
+          console.log(`[ProductFinder ${sectionId}] No active vehicle ID found for prefill.`);
+        }
+      } catch (error) {
+        console.error(`[ProductFinder ${sectionId}] Error during initialization or prefill:`, error);
+        // displayError might be called within loadTypesData or other load functions if they fail
+      }
     };
 
-    initialize();
+    initialize(); // Call the section's initialize function
 
   }); // End forEach loop
 
