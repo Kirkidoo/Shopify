@@ -1,0 +1,565 @@
+<style>
+  .mobile-dock {
+    display: none;
+    justify-content: {{ section.settings.icon_position }};
+    align-items: center;
+    padding: .5rem;
+    gap: 1rem;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: {{ section.settings.background_color }};
+    border-top: 0.1rem solid {{ section.settings.border_color }};
+    z-index:10;
+  }
+
+  .mobile-dock-item {
+    width: 4.4rem;
+    height: 4.4rem;
+    padding: .8rem;
+  }
+
+  .mobile-dock-item button.head-slot-nav-mobile-link {
+    width: 100%;
+    height: 100%;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .mobile-dock-item .head-slot-nav-link {
+    width: 100%;
+    height: 100%;
+    min-width: auto;
+  }
+
+  .mobile-dock-item a {
+    display: block;
+  }
+
+  .mobile-dock-item svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .mobile-dock-item svg path {
+    fill: {{ section.settings.icon_color }};
+  }
+
+  @media (max-width: 749px) {
+    .mobile-dock {
+      display: flex;
+    }
+  }
+</style>
+
+<div id="mobile-dock" class="mobile-dock" data-id="{{ section.id }}">
+  {% for block in section.blocks %}
+    {%- case block.type -%}
+      {% when 'custom_link' %}
+        <div class="mobile-dock-item" {{ block.shopify_attributes }}>
+          {% if block.settings.link != blank %}
+            <a href="{{ block.settings.link }}">
+              {% render 'icons', icon: block.settings.icon %}
+            </a>
+          {% else %}
+            {% render 'icons', icon: block.settings.icon %}
+          {% endif %}
+        </div>
+
+      {% when 'home' %}
+        <div class="mobile-dock-item" {{ block.shopify_attributes }}>
+          <a href="{{ routes.root_url }}">
+            {% render 'icons', icon: 'home' %}
+          </a>
+        </div>
+
+      {% when 'menu' %}
+        <div class="mobile-dock-item" {{ block.shopify_attributes }}>
+          <button class="head-slot-nav-mobile-link">
+            {% render 'icons', icon: 'menu' %}
+          </button>
+        </div>
+
+      {% when 'cart' %}
+        <div class="mobile-dock-item" {{ block.shopify_attributes }}>
+          <style>
+            .mobile-dock-item .head-slot-cart-link-wrap {
+              min-width: auto;
+            }
+
+            .mobile-dock-item .head-slot-cart-link-quantity {
+              background-color: {{ block.settings.badge_background_color }};
+              color: {{ block.settings.badge_color }};
+              top: -6px;
+              right: -10px;
+            }
+          </style>
+          {% unless settings.catalog_enabled %}
+            <drawer-toggle
+              id="mini-cart-toggle"
+              for="HeaderMiniCart"
+              {% if template == 'cart' %}
+                prevent-open="true"
+              {% endif %}
+            >
+              <a href="{{ routes.cart_url }}" class="head-slot-nav-link head-slot-cart-link">
+                <span class="visually-hidden">{{ 'sections.minicart.open' | t }}</span>
+                <span class="head-slot-cart-link-wrap">
+                  {% render 'icons', icon: 'cart' %}
+                  {%- if cart != empty -%}
+                    <span class="head-slot-cart-link-quantity">{{ cart.item_count }}</span>
+                  {%- endif -%}
+                </span>
+              </a>
+            </drawer-toggle>
+          {% endunless %}
+        </div>
+
+      {% when 'account' %}
+        <div class="mobile-dock-item" {{ block.shopify_attributes }}>
+          {%- if shop.customer_accounts_enabled -%}
+            <a
+              href="{%- if customer -%}{{ routes.account_url }}{%- else -%}{{ routes.account_login_url }}{%- endif -%}"
+              class="head-slot-nav-link head-slot-nav-link-account"
+            >
+              <span class="visually-hidden">
+                {%- if customer -%}
+                  {{ 'customer.account_fallback' | t }}
+                {%- else -%}
+                  {{ 'customer.log_in' | t }}
+                {%- endif -%}
+              </span>
+              {% render 'icons', icon: 'user' %}
+            </a>
+          {%- endif -%}
+        </div>
+    {%- endcase -%}
+  {% endfor %}
+</div>
+
+{% schema %}
+  {
+    "name": "t:sections.mobile_dock.name",
+    "tag": "section",
+    "class": "section-mobile-dock",
+    "enabled_on": {
+      "groups": ["custom.overlays"]
+    },
+    "limit": 1,
+    "settings": [
+      {
+        "type": "select",
+        "id": "icon_position",
+        "label": "t:sections.mobile_dock.settings.icon_position.label",
+        "default": "space-between",
+        "options": [
+          {
+            "value": "center",
+            "label": "t:sections.mobile_dock.settings.icon_position.options.center"
+          },
+          {
+            "value": "space-between",
+            "label": "t:sections.mobile_dock.settings.icon_position.options.space-between"
+          }
+        ]
+      },
+      {
+        "type": "color",
+        "id": "background_color",
+        "label": "t:sections.mobile_dock.settings.background_color.label",
+        "default": "#ffffff"
+      },
+      {
+        "type": "color",
+        "id": "icon_color",
+        "label": "t:sections.mobile_dock.settings.icon_color.label",
+        "default": "#000000"
+      },
+      {
+        "type": "color",
+        "id": "border_color",
+        "label": "t:sections.mobile_dock.settings.border_color.label",
+        "default": "#dadada"
+      }
+    ],
+    "max_blocks": 5,
+    "blocks": [
+      {
+        "type": "custom_link",
+        "name": "t:sections.mobile_dock.blocks.custom_link.name",
+        "settings": [
+          {
+            "type": "select",
+            "id": "icon",
+            "label": "t:sections.all.icon.name",
+            "default": "truck",
+            "options": [
+              {
+                "label": "",
+                "value": ""
+              },
+              {
+                "label": "t:sections.all.icon.options.label_activity",
+                "value": "activity"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_add_comment",
+                "value": "add-comment"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_aperture",
+                "value": "aperture"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_arrow_down",
+                "value": "arrow-down"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_arrow_left",
+                "value": "arrow-left"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_arrow_right",
+                "value": "arrow-right"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_arrow_up",
+                "value": "arrow-up"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_assembly",
+                "value": "assembly"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_at",
+                "value": "at"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_attachment",
+                "value": "attachment"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_award",
+                "value": "award"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_bag",
+                "value": "bag"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_basket",
+                "value": "basket"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_bookmark",
+                "value": "bookmark"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_box",
+                "value": "box"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_box_2",
+                "value": "box-2"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_cart",
+                "value": "cart"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_certificate",
+                "value": "certificate"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_chat",
+                "value": "chat"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_check",
+                "value": "check"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_clock",
+                "value": "clock"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_cog",
+                "value": "cog"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_credit_cart",
+                "value": "credit-card"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_cross",
+                "value": "cross"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_desktop",
+                "value": "desktop"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_document",
+                "value": "document"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_disabled",
+                "value": "disabled"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_email",
+                "value": "email"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_flag",
+                "value": "flag"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_gift_wrap",
+                "value": "gift-wrap"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_globe",
+                "value": "globe"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_heart",
+                "value": "heart"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_heart_full",
+                "value": "heart-full"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_home",
+                "value": "home"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_info",
+                "value": "info"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_label",
+                "value": "label"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_laptop",
+                "value": "laptop"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_map",
+                "value": "map"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_menu",
+                "value": "menu"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_minus",
+                "value": "minus"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_mobile",
+                "value": "mobile"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_paper_airplane",
+                "value": "paper-airplane"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_percent",
+                "value": "percent"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_phone",
+                "value": "phone"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_pin",
+                "value": "pin"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_plus",
+                "value": "plus"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_refund_receipt",
+                "value": "refund-receipt"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_returns",
+                "value": "returns"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_search",
+                "value": "search"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_settings",
+                "value": "settings"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_share",
+                "value": "share"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_shield",
+                "value": "shield"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_shield_plus",
+                "value": "shield-plus"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_shirt",
+                "value": "shirt"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_star_empty",
+                "value": "star-empty"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_star_full",
+                "value": "star-full"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_store",
+                "value": "store"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_support",
+                "value": "support"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_truck",
+                "value": "truck"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_user",
+                "value": "user"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_user_alt",
+                "value": "user-alt"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_wallet",
+                "value": "wallet"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_warning",
+                "value": "warning"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_facebook",
+                "value": "facebook"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_instagram",
+                "value": "instagram"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_linkedin",
+                "value": "linkedin"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_pinterest",
+                "value": "pinterest"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_snapchat",
+                "value": "snapchat"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_tiktok",
+                "value": "tiktok"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_tumblr",
+                "value": "tumblr"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_twitter",
+                "value": "twitter"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_x",
+                "value": "x"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_vimeo",
+                "value": "vimeo"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_youtube",
+                "value": "youtube"
+              },
+              {
+                "label": "t:sections.all.icon.options.label_whatsapp",
+                "value": "whatsapp"
+              }
+            ]
+          },
+          {
+            "type": "url",
+            "id": "link",
+            "label": "t:sections.mobile_dock.blocks.custom_link.settings.link.label"
+          }
+        ]
+      },
+      {
+        "type": "home",
+        "name": "t:sections.mobile_dock.blocks.home.name",
+        "limit": 1
+      },
+      {
+        "type": "menu",
+        "name": "t:sections.mobile_dock.blocks.menu.name",
+        "limit": 1
+      },
+      {
+        "type": "account",
+        "name": "t:sections.mobile_dock.blocks.account.name",
+        "limit": 1
+      },
+      {
+        "type": "cart",
+        "name": "t:sections.mobile_dock.blocks.cart.name",
+        "limit": 1,
+        "settings": [
+          {
+            "type": "color",
+            "id": "badge_color",
+            "label": "t:sections.mobile_dock.blocks.cart.settings.badge_color.label",
+            "default": "#ffffff"
+          },
+          {
+            "type": "color",
+            "id": "badge_background_color",
+            "label": "t:sections.mobile_dock.blocks.cart.settings.badge_background_color.label",
+            "default": "#000000"
+          }
+        ]
+      }
+    ],
+    "presets": [
+      {
+        "name": "t:sections.mobile_dock.presets.name",
+        "blocks": [
+          {
+            "type": "home"
+          },
+          {
+            "type": "menu"
+          },
+          {
+            "type": "cart"
+          },
+          {
+            "type": "account"
+          }
+        ]
+      }
+    ]
+  }
+{% endschema %}

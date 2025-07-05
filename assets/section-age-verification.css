@@ -1,0 +1,96 @@
+/* Section - Age Verification
+========================================= */
+age-verification[open] .modal-dialog-wrap {
+  display: flex;
+  animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.age-verification-dialog-wrap.fade-out {
+  animation: fadeOut 0.3s ease-in-out forwards;
+}
+
+.age-verification-dialog-wrap .modal-dialog-content-wrap {
+  padding: 0;
+}
+
+.age-verification-dialog-wrap .modal-dialog-content {
+  padding: 2rem;
+}
+
+@media (min-width: 750px) {
+  .age-verification-dialog-wrap .modal-dialog-content {
+    padding: 4.5rem;
+  }
+}
+
+.modal-dialog-image-position-right .modal-dismiss-button,
+.modal-dialog-image-position-top .modal-dismiss-button {
+  color: var(--color-base-white);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--buttons-radius);
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 32px;
+  height: 32px;
+}
+
+.age-verification-content {
+  text-align: center;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  grid-gap: 1.5rem;
+}
+
+.age-verification-content > *,
+.age-verification-content > :last-child {
+  margin-bottom: 0;
+}
+
+/* Divider */
+.age-verification-divider {
+  width: 100%;
+  height: 1px;
+  background-color: var(--color-border);
+  margin: 0.5rem 0;
+}
+
+/* Buttons */
+.age-verification-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.age-verification-buttons .button {
+  min-width: 120px;
+}
+
+/* Rejection message */
+.age-verification-rejection-message {
+  padding: 1.5rem;
+  border-radius: var(--border-radius-base);
+  background-color: rgba(var(--color-error-rgb), 0.1);
+  color: rgb(var(--color-error-rgb));
+  text-align: center;
+}

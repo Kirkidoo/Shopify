@@ -1,0 +1,99 @@
+/* Component - Product row
+=================================== */
+.product-rows {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.product-row {
+  border-bottom: solid 1px var(--color-border);
+  padding: 0.5rem; /* This is the "compact" density. In main-collection-product-grid.liquid, we set a "comfortable" density.*/
+  transition: background-color 0.2s ease;
+  justify-content: space-between;
+  position: relative;
+}
+
+@media (min-width: 749px) {
+  .product-row {
+    display: flex;
+    align-items: center;
+    gap: 5rem;
+  }
+}
+
+.product-row:hover {
+  background-color: #ffffb5;
+}
+
+.product-row .row-content {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  gap: 1rem;
+}
+
+.product-row .row-heading {
+  font-size: calc(var(--font-heading-scale) * 1.4rem);
+  font-weight: 400;
+  color: rgb(var(--color-foreground-alt));
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .product-row .row-heading {
+    padding-inline-end: 13rem;
+    padding-block-end: 0.5rem;
+  }
+}
+
+.product-row .row-heading a {
+  color: currentColor;
+  text-decoration-color: transparent;
+}
+
+.product-row .badge {
+  padding: 0.2rem 0.6rem;
+  font-size: calc(var(--font-body-scale) * 1.1rem);
+}
+
+.product-row .row-price .price-item {
+  font-size: calc(var(--font-heading-scale) * 1.4rem);
+}
+
+.product-row .row-price .price-sale {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.product-row .row-price .price-sale s {
+  margin: 0;
+}
+
+.product-row .row-actions .product-actions {
+  margin-block-start: 0;
+}
+
+@media (max-width: 767px) {
+  .product-row .row-actions {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+}
+
+.product-row .row-actions .product-actions .button {
+  font-size: calc(var(--font-body-scale) * 1.4rem);
+}
+
+@media (min-width: 767px) {
+  .product-row .row-actions .product-actions .button {
+    padding: 0.4rem 0.5rem;
+  }
+}
+
+.product-row .row-actions .product-actions .button-outline {
+  background-color: rgb(var(--color-background));
+}

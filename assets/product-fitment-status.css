@@ -1,0 +1,59 @@
+/* Styles for Product Fitment Status Section */
+.product-fitment-status-container {
+  margin: 15px 0;
+  padding: 10px 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  text-align: center;
+  font-size: 0.95em;
+}
+
+.fitment-status-placeholder,
+.fitment-status-message {
+  margin: 0;
+  padding: 5px 0;
+  color: #333; /* Default text color */
+}
+
+/* Styling for "fits" message */
+.fitment-status-message.type-fits {
+  color: #28a745; /* Green text */
+  font-weight: bold;
+  background-color: #e9f7ef; /* Light green background */
+  border-left: 4px solid #28a745;
+  padding-left: 10px;
+}
+
+/* Styling for "does not fit" message */
+.fitment-status-message.type-does-not-fit {
+  color: #dc3545; /* Red text */
+  font-weight: bold;
+  background-color: #fdecea; /* Light red background */
+  border-left: 4px solid #dc3545;
+  padding-left: 10px;
+}
+
+/* Styling for "no vehicle selected" message */
+.fitment-status-message.type-no-vehicle {
+  color: #555; /* Dark grey text */
+  background-color: #f0f0f0; /* Light grey background */
+  border-left: 4px solid #777;
+  padding-left: 10px;
+  font-style: italic;
+}
+
+/* Styling for "error" message (e.g., API error) */
+.fitment-status-message.type-error {
+  color: #721c24; /* Dark red text */
+  background-color: #f8d7da; /* Light pink/red background for errors */
+  border-left: 4px solid #721c24; /* Darker red border */
+  padding-left: 10px;
+  font-weight: bold;
+}
+
+/* Hide the container if it's empty or only has a hidden placeholder */
+.product-fitment-status-container:empty,
+.product-fitment-status-container > .fitment-status-placeholder[style*="display: none"] {
+  display: none;
+}
