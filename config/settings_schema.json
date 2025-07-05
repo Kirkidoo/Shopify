@@ -169,6 +169,28 @@
     ]
   },
   {
+    "name": "Gamma Powersports API",
+    "settings": [
+      {
+        "type": "header",
+        "content": "API Credentials"
+      },
+      {
+        "type": "text",
+        "id": "gamma_api_key",
+        "label": "Gamma API Key",
+        "info": "Enter your API key for Gamma Powersports."
+      },
+      {
+        "type": "text",
+        "id": "gamma_api_base_url",
+        "label": "Gamma API Base URL",
+        "default": "https://api.gammapowersports.com",
+        "info": "The base URL for the Gamma Powersports API."
+      }
+    ]
+  },
+  {
     "name": "t:settings_schema.typography.name",
     "settings": [
       {

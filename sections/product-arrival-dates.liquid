@@ -15,7 +15,7 @@
   # --- Section Settings ---
   assign enabled = section.settings.enable_arrival_dates
   # Get token from global theme settings
-  assign api_token = settings.gamma_api_token
+  assign api_token = settings.gamma_api_key
   # Get base URL or use default
   assign api_base_url = settings.gamma_api_base_url | default: "https://api.gammapowersports.com"
   # Check even if variant is available?

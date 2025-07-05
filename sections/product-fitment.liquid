@@ -14,7 +14,7 @@
 
     {% comment %} Get API credentials from global Theme Settings {% endcomment %}
     {%- assign base_url = settings.gamma_api_base_url | default: "https://api.gammapowersports.com" -%}
-    {%- assign api_token = settings.gamma_api_token -%}
+    {%- assign api_token = settings.gamma_api_key -%}
     {%- assign fitment_endpoint = base_url | append: '/item/getFitmentMachines' -%}
 
     {% comment %}
