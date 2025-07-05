@@ -10,7 +10,7 @@
 
 {% comment %} Get API credentials from global Theme Settings {% endcomment %}
 {% assign global_api_base_url = settings.gamma_api_base_url | default: "https://api.gammapowersports.com" %}
-{% assign global_api_token = settings.gamma_api_token %}
+{% assign global_api_token = settings.gamma_api_key %}
 
 {% comment %} Get section-specific settings {% endcomment %}
 {% assign enable_toggle = section.settings.enable_toggle %}
